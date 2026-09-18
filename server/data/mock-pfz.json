@@ -1,0 +1,159 @@
+{
+  "description": "Mock Potential Fishing Zone (PFZ) data for Indian coastal regions. Based on typical INCOIS PFZ advisory patterns.",
+  "last_updated": "2026-09-15T06:00:00Z",
+  "source": "Mock data for ORCA MVP — simulates INCOIS PFZ advisories",
+  "zones": [
+    {
+      "id": "PFZ-GJ-001",
+      "name": "Gujarat Offshore Zone",
+      "state": "Gujarat",
+      "coordinates": { "lat": 21.45, "lon": 69.10 },
+      "bounds": {
+        "north": 22.00, "south": 20.90,
+        "east": 70.00, "west": 68.20
+      },
+      "depth_range_m": { "min": 30, "max": 100 },
+      "confidence": 0.85,
+      "advisory": "High potential zone — favorable chlorophyll concentration and SST gradient detected.",
+      "likely_species": ["Pomfret", "Ribbonfish", "Bombay Duck"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 28.5,
+      "chlorophyll_mg_m3": 2.8,
+      "wind_speed_knots": 12
+    },
+    {
+      "id": "PFZ-MH-001",
+      "name": "Ratnagiri Coastal Zone",
+      "state": "Maharashtra",
+      "coordinates": { "lat": 17.00, "lon": 73.10 },
+      "bounds": {
+        "north": 17.50, "south": 16.50,
+        "east": 73.80, "west": 72.40
+      },
+      "depth_range_m": { "min": 20, "max": 80 },
+      "confidence": 0.78,
+      "advisory": "Moderate potential — good SST conditions, moderate chlorophyll levels.",
+      "likely_species": ["Mackerel", "Sardine", "Surmai"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 29.1,
+      "chlorophyll_mg_m3": 1.9,
+      "wind_speed_knots": 15
+    },
+    {
+      "id": "PFZ-GA-001",
+      "name": "Goa Nearshore Zone",
+      "state": "Goa",
+      "coordinates": { "lat": 15.35, "lon": 73.70 },
+      "bounds": {
+        "north": 15.60, "south": 15.10,
+        "east": 74.00, "west": 73.40
+      },
+      "depth_range_m": { "min": 15, "max": 50 },
+      "confidence": 0.72,
+      "advisory": "Moderate potential — favorable currents, watch for monsoon swell.",
+      "likely_species": ["Kingfish", "Tuna", "Prawns"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 28.8,
+      "chlorophyll_mg_m3": 2.1,
+      "wind_speed_knots": 18
+    },
+    {
+      "id": "PFZ-KA-001",
+      "name": "Mangalore Deep Sea Zone",
+      "state": "Karnataka",
+      "coordinates": { "lat": 13.00, "lon": 74.20 },
+      "bounds": {
+        "north": 13.50, "south": 12.50,
+        "east": 74.80, "west": 73.60
+      },
+      "depth_range_m": { "min": 50, "max": 150 },
+      "confidence": 0.82,
+      "advisory": "High potential — strong upwelling detected, rich nutrient concentration.",
+      "likely_species": ["Oil Sardine", "Mackerel", "Anchovy"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 27.3,
+      "chlorophyll_mg_m3": 3.5,
+      "wind_speed_knots": 10
+    },
+    {
+      "id": "PFZ-KL-001",
+      "name": "Kerala Coastal Zone",
+      "state": "Kerala",
+      "coordinates": { "lat": 9.95, "lon": 75.80 },
+      "bounds": {
+        "north": 10.50, "south": 9.40,
+        "east": 76.30, "west": 75.30
+      },
+      "depth_range_m": { "min": 20, "max": 80 },
+      "confidence": 0.88,
+      "advisory": "Very high potential — excellent chlorophyll bloom detected, ideal SST gradient.",
+      "likely_species": ["Sardine", "Mackerel", "Tuna", "Seer Fish"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 27.8,
+      "chlorophyll_mg_m3": 4.2,
+      "wind_speed_knots": 8
+    },
+    {
+      "id": "PFZ-TN-001",
+      "name": "Tamil Nadu Gulf of Mannar Zone",
+      "state": "Tamil Nadu",
+      "coordinates": { "lat": 9.20, "lon": 79.30 },
+      "bounds": {
+        "north": 9.80, "south": 8.60,
+        "east": 79.90, "west": 78.70
+      },
+      "depth_range_m": { "min": 10, "max": 60 },
+      "confidence": 0.75,
+      "advisory": "Moderate potential — good diversity zone, suitable for multi-species fishing.",
+      "likely_species": ["Grouper", "Snapper", "Crab", "Lobster"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 29.5,
+      "chlorophyll_mg_m3": 1.5,
+      "wind_speed_knots": 14
+    },
+    {
+      "id": "PFZ-AP-001",
+      "name": "Visakhapatnam Offshore Zone",
+      "state": "Andhra Pradesh",
+      "coordinates": { "lat": 17.70, "lon": 83.50 },
+      "bounds": {
+        "north": 18.20, "south": 17.20,
+        "east": 84.20, "west": 82.80
+      },
+      "depth_range_m": { "min": 40, "max": 120 },
+      "confidence": 0.80,
+      "advisory": "High potential — favorable SST and current convergence zone.",
+      "likely_species": ["Tuna", "Seer Fish", "Ribbonfish", "Shrimp"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 28.9,
+      "chlorophyll_mg_m3": 2.4,
+      "wind_speed_knots": 11
+    },
+    {
+      "id": "PFZ-OR-001",
+      "name": "Odisha Chilika-Puri Zone",
+      "state": "Odisha",
+      "coordinates": { "lat": 19.80, "lon": 85.90 },
+      "bounds": {
+        "north": 20.30, "south": 19.30,
+        "east": 86.50, "west": 85.30
+      },
+      "depth_range_m": { "min": 20, "max": 70 },
+      "confidence": 0.70,
+      "advisory": "Moderate potential — seasonal migration patterns favorable.",
+      "likely_species": ["Hilsa", "Pomfret", "Prawn", "Catfish"],
+      "valid_from": "2026-09-15T00:00:00Z",
+      "valid_until": "2026-09-17T23:59:59Z",
+      "sst_celsius": 29.2,
+      "chlorophyll_mg_m3": 1.8,
+      "wind_speed_knots": 16
+    }
+  ]
+}

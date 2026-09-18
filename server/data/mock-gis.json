@@ -1,0 +1,111 @@
+{
+  "description": "Mock GeoJSON data for Indian fishing zone boundaries and key harbors.",
+  "source": "Mock data for ORCA MVP — simplified coastal fishing zone boundaries",
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Gujarat Fishing Zone",
+        "state": "Gujarat",
+        "zone_type": "deep_sea",
+        "harbors": ["Porbandar", "Veraval", "Okha"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[68.2, 20.9], [70.0, 20.9], [70.0, 22.0], [68.2, 22.0], [68.2, 20.9]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Maharashtra Fishing Zone",
+        "state": "Maharashtra",
+        "zone_type": "coastal",
+        "harbors": ["Ratnagiri", "Malvan", "Sassoon Dock"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[72.4, 16.5], [73.8, 16.5], [73.8, 17.5], [72.4, 17.5], [72.4, 16.5]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Goa Fishing Zone",
+        "state": "Goa",
+        "zone_type": "nearshore",
+        "harbors": ["Vasco", "Cutbona", "Malim"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[73.4, 15.1], [74.0, 15.1], [74.0, 15.6], [73.4, 15.6], [73.4, 15.1]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Karnataka Fishing Zone",
+        "state": "Karnataka",
+        "zone_type": "deep_sea",
+        "harbors": ["Mangalore", "Karwar", "Malpe"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[73.6, 12.5], [74.8, 12.5], [74.8, 13.5], [73.6, 13.5], [73.6, 12.5]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Kerala Fishing Zone",
+        "state": "Kerala",
+        "zone_type": "coastal",
+        "harbors": ["Kochi", "Kozhikode", "Vizhinjam", "Beypore"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[75.3, 9.4], [76.3, 9.4], [76.3, 10.5], [75.3, 10.5], [75.3, 9.4]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Tamil Nadu Gulf of Mannar Zone",
+        "state": "Tamil Nadu",
+        "zone_type": "nearshore",
+        "harbors": ["Rameswaram", "Tuticorin", "Nagapattinam"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[78.7, 8.6], [79.9, 8.6], [79.9, 9.8], [78.7, 9.8], [78.7, 8.6]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Andhra Pradesh Fishing Zone",
+        "state": "Andhra Pradesh",
+        "zone_type": "deep_sea",
+        "harbors": ["Visakhapatnam", "Kakinada", "Nizampatnam"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[82.8, 17.2], [84.2, 17.2], [84.2, 18.2], [82.8, 18.2], [82.8, 17.2]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Odisha Fishing Zone",
+        "state": "Odisha",
+        "zone_type": "coastal",
+        "harbors": ["Paradip", "Gopalpur", "Dhamra"]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[85.3, 19.3], [86.5, 19.3], [86.5, 20.3], [85.3, 20.3], [85.3, 19.3]]]
+      }
+    }
+  ]
+}

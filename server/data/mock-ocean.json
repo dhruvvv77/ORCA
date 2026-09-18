@@ -1,0 +1,103 @@
+{
+  "description": "Mock ocean observation data — SST, Chlorophyll-a, Wave Height for Indian coastal regions.",
+  "last_updated": "2026-09-15T06:00:00Z",
+  "source": "Mock data for ORCA MVP — simulates INCOIS/ISRO ocean observations",
+  "observations": [
+    {
+      "region": "Gujarat Coast",
+      "state": "Gujarat",
+      "coordinates": { "lat": 21.45, "lon": 69.10 },
+      "sst": { "value": 28.5, "unit": "°C", "trend": "stable", "anomaly": 0.3 },
+      "chlorophyll": { "value": 2.8, "unit": "mg/m³", "level": "moderate", "bloom": false },
+      "wave": { "significant_height_m": 1.8, "max_height_m": 2.9, "period_s": 8, "direction": "SW" },
+      "current": { "speed_knots": 1.2, "direction": "NE" },
+      "salinity_psu": 35.2,
+      "dissolved_oxygen_ml_l": 4.8,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Maharashtra Coast",
+      "state": "Maharashtra",
+      "coordinates": { "lat": 17.00, "lon": 73.10 },
+      "sst": { "value": 29.1, "unit": "°C", "trend": "rising", "anomaly": 0.7 },
+      "chlorophyll": { "value": 1.9, "unit": "mg/m³", "level": "low-moderate", "bloom": false },
+      "wave": { "significant_height_m": 2.2, "max_height_m": 3.5, "period_s": 9, "direction": "W" },
+      "current": { "speed_knots": 0.8, "direction": "N" },
+      "salinity_psu": 34.8,
+      "dissolved_oxygen_ml_l": 5.1,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Goa Coast",
+      "state": "Goa",
+      "coordinates": { "lat": 15.35, "lon": 73.70 },
+      "sst": { "value": 28.8, "unit": "°C", "trend": "stable", "anomaly": 0.2 },
+      "chlorophyll": { "value": 2.1, "unit": "mg/m³", "level": "moderate", "bloom": false },
+      "wave": { "significant_height_m": 2.5, "max_height_m": 4.0, "period_s": 10, "direction": "WSW" },
+      "current": { "speed_knots": 1.0, "direction": "NNE" },
+      "salinity_psu": 34.5,
+      "dissolved_oxygen_ml_l": 5.3,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Karnataka Coast",
+      "state": "Karnataka",
+      "coordinates": { "lat": 13.00, "lon": 74.20 },
+      "sst": { "value": 27.3, "unit": "°C", "trend": "falling", "anomaly": -0.5 },
+      "chlorophyll": { "value": 3.5, "unit": "mg/m³", "level": "high", "bloom": true },
+      "wave": { "significant_height_m": 1.5, "max_height_m": 2.4, "period_s": 7, "direction": "W" },
+      "current": { "speed_knots": 1.5, "direction": "N" },
+      "salinity_psu": 34.2,
+      "dissolved_oxygen_ml_l": 4.5,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Kerala Coast",
+      "state": "Kerala",
+      "coordinates": { "lat": 9.95, "lon": 75.80 },
+      "sst": { "value": 27.8, "unit": "°C", "trend": "falling", "anomaly": -0.3 },
+      "chlorophyll": { "value": 4.2, "unit": "mg/m³", "level": "high", "bloom": true },
+      "wave": { "significant_height_m": 1.2, "max_height_m": 1.9, "period_s": 7, "direction": "W" },
+      "current": { "speed_knots": 1.8, "direction": "NW" },
+      "salinity_psu": 33.9,
+      "dissolved_oxygen_ml_l": 4.2,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Tamil Nadu Coast",
+      "state": "Tamil Nadu",
+      "coordinates": { "lat": 9.20, "lon": 79.30 },
+      "sst": { "value": 29.5, "unit": "°C", "trend": "rising", "anomaly": 0.8 },
+      "chlorophyll": { "value": 1.5, "unit": "mg/m³", "level": "low", "bloom": false },
+      "wave": { "significant_height_m": 1.0, "max_height_m": 1.6, "period_s": 6, "direction": "SE" },
+      "current": { "speed_knots": 0.6, "direction": "NE" },
+      "salinity_psu": 34.0,
+      "dissolved_oxygen_ml_l": 5.5,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Andhra Pradesh Coast",
+      "state": "Andhra Pradesh",
+      "coordinates": { "lat": 17.70, "lon": 83.50 },
+      "sst": { "value": 28.9, "unit": "°C", "trend": "stable", "anomaly": 0.4 },
+      "chlorophyll": { "value": 2.4, "unit": "mg/m³", "level": "moderate", "bloom": false },
+      "wave": { "significant_height_m": 1.4, "max_height_m": 2.2, "period_s": 8, "direction": "S" },
+      "current": { "speed_knots": 0.9, "direction": "SW" },
+      "salinity_psu": 33.5,
+      "dissolved_oxygen_ml_l": 5.0,
+      "timestamp": "2026-09-15T06:00:00Z"
+    },
+    {
+      "region": "Odisha Coast",
+      "state": "Odisha",
+      "coordinates": { "lat": 19.80, "lon": 85.90 },
+      "sst": { "value": 29.2, "unit": "°C", "trend": "rising", "anomaly": 0.6 },
+      "chlorophyll": { "value": 1.8, "unit": "mg/m³", "level": "low-moderate", "bloom": false },
+      "wave": { "significant_height_m": 2.0, "max_height_m": 3.2, "period_s": 9, "direction": "S" },
+      "current": { "speed_knots": 1.1, "direction": "W" },
+      "salinity_psu": 32.8,
+      "dissolved_oxygen_ml_l": 5.2,
+      "timestamp": "2026-09-15T06:00:00Z"
+    }
+  ]
+}
