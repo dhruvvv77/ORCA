@@ -10,7 +10,6 @@ import { agentHandlers as gisHandlers } from './agents/gis-agent.js';
 import { agentHandlers as safetyHandlers } from './agents/safety-agent.js';
 import { agentHandlers as recommendationHandlers } from './agents/recommendation-agent.js';
 import { fetchCurrentWeather } from './weather.js';
-import { getMarineMapData } from './marine-map.js';
 
 const defaultAgents = {
   getPFZ: pfzHandlers.get_pfz_zones,
@@ -19,8 +18,37 @@ const defaultAgents = {
   getGIS: gisHandlers.calculate_pfz_distances,
   getSafety: safetyHandlers.assess_marine_safety,
   getRecommendation: recommendationHandlers.get_fishing_recommendation,
-  getMap: getMarineMapData,
 };
+
+function compactPFZCandidates(zones = []) {
+  return zones.map((zone) => ({
+    id: zone.id,
+    name: zone.name,
+    state: zone.state,
+    coordinates: zone.coordinates,
+    confidence: zone.confidence,
+  }));
+}
+
+function compactOceanObservations(observations = []) {
+  return observations.map((observation) => ({
+    state: observation.state,
+    sst: observation.sst,
+    chlorophyll: observation.chlorophyll,
+    wave: observation.wave,
+  }));
+}
+
+function compactWeatherForDecision(weather) {
+  return {
+    coordinates: weather?.coordinates,
+    wind: { speed: weather?.wind?.speed },
+    weather: {
+      main: weather?.weather?.main,
+      description: weather?.weather?.description,
+    },
+  };
+}
 
 function coordinatePair(location, weatherResult) {
   const latitude = location?.latitude ?? location?.coordinates?.lat ?? weatherResult?.coordinates?.lat;
@@ -33,11 +61,16 @@ function coordinatePair(location, weatherResult) {
 
 function normalizedRequest(request, coordinates) {
   const location = request?.location ?? {};
+  const today = new Date().toISOString().split('T')[0];
+  let date = request?.date ?? null;
+  if (!date || date.toLowerCase() === 'today' || date === '2024-09-18' || date.startsWith('2024-')) {
+    date = today;
+  }
 
   return {
     query: request?.query ?? null,
     intent: request?.intent ?? null,
-    date: request?.date ?? null,
+    date,
     location: {
       city: location.city ?? null,
       state: location.state ?? null,
@@ -61,24 +94,26 @@ export function createOrchestrator(agents = defaultAgents) {
     const oceanResult = await agents.getOcean({ state });
     const weatherResult = await agents.getWeather(location.city, location.country_code);
     const coordinates = coordinatePair(location, weatherResult);
+    const pfzCandidates = compactPFZCandidates(pfzResult.zones);
+    const oceanForDecision = { observations: compactOceanObservations(oceanResult.observations) };
+    const weatherForDecision = compactWeatherForDecision(weatherResult);
     const gisResult = await agents.getGIS({
       latitude: coordinates?.lat,
       longitude: coordinates?.lon,
-      pfz_candidates: pfzResult.zones ?? [],
+      pfz_candidates: pfzCandidates,
       sort: 'asc',
     });
     const safetyResult = await agents.getSafety({
-      weather: weatherResult,
-      ocean: oceanResult,
+      weather: weatherForDecision,
+      ocean: oceanForDecision,
     });
     const recommendationResult = await agents.getRecommendation({
-      pfz: pfzResult,
-      ocean: oceanResult,
-      weather: weatherResult,
+      pfz: { zones: pfzCandidates },
+      ocean: oceanForDecision,
+      weather: weatherForDecision,
       gis: gisResult,
       safety: safetyResult,
     });
-    const marineMap = await agents.getMap();
 
     return {
       interpreted_request: normalizedRequest(request, coordinates),
@@ -100,7 +135,6 @@ export function createOrchestrator(agents = defaultAgents) {
         user_location: coordinates,
         pfz_candidates: gisResult.candidates ?? [],
         selected_pfz: recommendationResult.selected_pfz ?? null,
-        marine_map: marineMap,
       },
     };
   };
@@ -118,21 +152,18 @@ export const orchestratorTools = [
     type: 'function',
     function: {
       name: 'run_orca_fishing_pipeline',
-      description:
-        'Run the complete deterministic ORCA fishing recommendation pipeline: PFZ, ocean, weather, GIS distance, safety, and recommendation. Use only for requests asking where or whether to fish, or for fishing-trip recommendations. Resolve city, state, country, and date from the current conversation when available.',
+      description: 'Run ORCA deterministic fishing pipeline (PFZ, ocean, weather, GIS, safety). Use for fishing trip/location queries.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'The fishing recommendation request in English.' },
-          date: { type: 'string', description: 'Requested date from the conversation, if stated (for example, today).' },
+          query: { type: 'string', description: 'Query in English.' },
+          date: { type: 'string', description: 'Date (YYYY-MM-DD or today).' },
           location: {
             type: 'object',
             properties: {
-              city: { type: 'string' },
-              state: { type: 'string', description: 'Indian coastal state for PFZ and ocean lookup. Mumbai is in Maharashtra.' },
-              country_code: { type: 'string', description: 'ISO country code, for example IN.' },
-              latitude: { type: 'number' },
-              longitude: { type: 'number' },
+              city: { type: 'string', description: 'City name (e.g. Mumbai).' },
+              state: { type: 'string', description: 'Coastal state (e.g. Maharashtra).' },
+              country_code: { type: 'string', description: 'Country code (default IN).' },
             },
             required: ['city', 'state'],
           },

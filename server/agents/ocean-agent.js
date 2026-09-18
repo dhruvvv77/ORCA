@@ -30,22 +30,12 @@ export const agentTools = [
     type: 'function',
     function: {
       name: 'get_ocean_data',
-      description:
-        'Get ocean observation data for an Indian coastal region. Returns Sea Surface Temperature (SST), chlorophyll-a, wave height, currents, salinity, and dissolved oxygen. Filter by state or parameter.',
+      description: 'Get ocean observation data (SST, chlorophyll, wave height, currents) for Indian coastal regions.',
       parameters: {
         type: 'object',
         properties: {
-          state: {
-            type: 'string',
-            description:
-              'Indian coastal state, e.g. "Kerala", "Gujarat", "Tamil Nadu". Leave empty for all regions.',
-          },
-          parameter: {
-            type: 'string',
-            enum: ['sst', 'chlorophyll', 'wave', 'current', 'all'],
-            description:
-              'Specific ocean parameter to retrieve. Use "all" for complete data. Defaults to "all".',
-          },
+          state: { type: 'string', description: 'Indian coastal state (e.g. Tamil Nadu, Kerala, Maharashtra).' },
+          parameter: { type: 'string', enum: ['sst', 'chlorophyll', 'wave', 'current', 'all'] },
         },
         required: [],
       },

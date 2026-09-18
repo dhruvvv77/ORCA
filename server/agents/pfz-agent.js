@@ -30,21 +30,12 @@ export const agentTools = [
     type: 'function',
     function: {
       name: 'get_pfz_zones',
-      description:
-        'Get Potential Fishing Zone (PFZ) advisories for Indian coastal regions. Returns zones with confidence scores, likely fish species, SST, chlorophyll levels, and safety conditions. You can filter by state name or get all zones.',
+      description: 'Get Potential Fishing Zone (PFZ) advisories for Indian coastal regions.',
       parameters: {
         type: 'object',
         properties: {
-          state: {
-            type: 'string',
-            description:
-              'Indian coastal state to filter by, e.g. "Kerala", "Gujarat", "Tamil Nadu", "Maharashtra", "Goa", "Karnataka", "Andhra Pradesh", "Odisha". Leave empty for all zones.',
-          },
-          min_confidence: {
-            type: 'number',
-            description:
-              'Minimum confidence score (0-1) to filter zones. Defaults to 0.',
-          },
+          state: { type: 'string', description: 'Indian coastal state (e.g. Maharashtra, Kerala, Tamil Nadu).' },
+          min_confidence: { type: 'number', description: 'Min confidence score (0-1).' },
         },
         required: [],
       },

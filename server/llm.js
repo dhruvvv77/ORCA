@@ -7,25 +7,14 @@ import { toolDefinitions, toolHandlers } from './tools.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'openai/gpt-oss-120b';
-const MAX_TOOL_ITERATIONS = 3;
+const MAX_TOOL_ITERATIONS = 2;
 
-const SYSTEM_PROMPT = `You are ORCA, a marine ecosystem intelligence assistant built for Indian fishers and coastal communities. Your capabilities:
+function getSystemPrompt() {
+  const today = new Date().toISOString().split('T')[0];
+  return `You are ORCA, a concise marine assistant for Indian fishers. Today is ${today}. Use tool data exactly; never invent measurements. Explain weather, ocean, and PFZ data practically, noting mock data when supplied. Mention PFZ confidence, species, and safety when available; mention maps or charts when data includes them. Use the user's language when possible. Treat selected marine-map context as factual.
 
-- You provide weather information, ocean conditions, and Potential Fishing Zone (PFZ) advisories
-- You understand queries about fishing, marine conditions, SST, chlorophyll, wave height, and ocean currents
-- You use relevant emojis naturally (🐟 🌊 ⛅ 🎣 🗺️ 🌡️ etc.)
-- You keep answers concise but informative — 2-4 sentences for simple queries, more for detailed analysis
-- For fishing queries, combine PFZ data with weather conditions to give practical advice
-- For weather queries, provide clear conversational information including what to wear and travel advisories
-- For ocean data, explain SST, chlorophyll, and wave conditions in practical terms fishers can understand
-- IMPORTANT: When you have data from your tools, always base your answer on the ACTUAL data provided. Never fabricate SST, chlorophyll, coordinates, wave heights, or any measurements.
-- When PFZ data is returned, always mention the confidence level, likely species, and safety conditions
-- If data includes coordinates, mention that a map is available for reference
-- When presenting forecast data, mention that a chart is available for visualization
-- Clearly note when data is from mock/simulated sources
-- When a user message includes a bracketed "Selected ORCA marine-map context", treat it as the currently selected dashboard PFZ. Use its supplied values for zone/species/distance questions; do not invent missing values.
-- For fishing recommendation queries such as "Where can I fish today near Mumbai?", call run_orca_fishing_pipeline rather than separately calculating PFZ, ocean, GIS, safety, or recommendation data. Use location and date from the current message or prior conversation context. Do not call it for weather-only, PFZ-only, or ocean-only queries.
-- You respond in the same language as the user's query when possible`;
+For a fishing recommendation (for example, "Where can I fish today near Mumbai?"), call run_orca_fishing_pipeline once, using location (city and state, e.g. Mumbai is in Maharashtra) and date "${today}". Do not separately call PFZ, ocean, GIS, safety, or recommendation tools. Do not use the pipeline for weather-only, PFZ-only, or ocean-only requests.`;
+}
 
 function getApiKey() {
   const key = process.env.GROQ_API_KEY;
@@ -45,7 +34,7 @@ async function callGroq(messages, tools = null) {
     model: MODEL,
     messages,
     temperature: 0.7,
-    max_tokens: 1024,
+    max_tokens: 384,
   };
 
   if (tools && tools.length > 0) {
@@ -69,6 +58,133 @@ async function callGroq(messages, tools = null) {
   }
 
   return res.json();
+}
+
+function isFishingRecommendationQuery(conversationHistory) {
+  const latestUserMessage = [...conversationHistory].reverse().find((message) => message.role === 'user')?.content || '';
+  return /\b(fish|fishing|angling)\b/i.test(latestUserMessage)
+    && /\b(where|which|recommend|suitable|safe|should|today|near)\b/i.test(latestUserMessage);
+}
+
+function toolsForConversation(conversationHistory) {
+  if (isFishingRecommendationQuery(conversationHistory)) {
+    return toolDefinitions.filter((tool) => tool.function.name === 'run_orca_fishing_pipeline');
+  }
+  return toolDefinitions.filter((tool) => tool.function.name !== 'run_orca_fishing_pipeline');
+}
+
+function compactToolResult(fnName, result) {
+  if (fnName === 'run_orca_fishing_pipeline') {
+    const recommendation = result.recommendation_result || {};
+    const selected = recommendation.selected_pfz;
+    const distance = result.gis_result?.candidates?.find((candidate) => candidate.id === selected?.id)?.distance_km
+      ?? result.gis_result?.nearest_pfz?.distance_km
+      ?? null;
+    return {
+      date: result.interpreted_request?.date,
+      location: result.interpreted_request?.location ? `${result.interpreted_request.location.city}, ${result.interpreted_request.location.state}` : null,
+      recommendation: {
+        score: recommendation.score,
+        zone: selected?.name,
+        confidence: selected?.confidence,
+        species: selected?.likely_species,
+        safety_status: recommendation.safety_status,
+        distance_km: distance,
+        reasons: recommendation.reasons?.slice(0, 2),
+      },
+      safety: {
+        status: result.safety_result?.status,
+        reasons: result.safety_result?.reasons?.slice(0, 2),
+      },
+    };
+  }
+
+  if (fnName === 'get_current_weather') {
+    return {
+      city: result.city,
+      temp_c: result.temperature?.current,
+      wind_m_s: result.wind?.speed,
+      condition: result.weather?.description || result.weather?.main,
+      humidity: result.humidity,
+    };
+  }
+
+  if (fnName === 'get_forecast') {
+    return {
+      city: result.city,
+      forecast: result.forecast?.slice(0, 3).map((d) => ({
+        day: d.day_name,
+        temp_c: `${d.temperature?.low}-${d.temperature?.high}`,
+        condition: d.weather?.description,
+        pop: d.precipitation_chance,
+      })),
+    };
+  }
+
+  if (fnName === 'get_air_quality') {
+    return {
+      city: result.city,
+      aqi: result.aqi?.label,
+      pm2_5: result.pollutants?.pm2_5,
+      pm10: result.pollutants?.pm10,
+    };
+  }
+
+  if (fnName === 'get_pfz_zones') {
+    return {
+      found: result.found,
+      count: result.count,
+      zones: result.zones?.slice(0, 3).map((zone) => ({
+        name: zone.name,
+        state: zone.state,
+        confidence: zone.confidence,
+        species: zone.likely_species,
+        conditions: zone.conditions,
+      })),
+      source: result.source,
+    };
+  }
+
+  if (fnName === 'get_ocean_data') {
+    return {
+      found: result.found,
+      observations: result.observations?.slice(0, 3).map((observation) => ({
+        region: observation.region,
+        state: observation.state,
+        sst: observation.sst?.value ?? observation.sst,
+        chlorophyll: observation.chlorophyll?.value ?? observation.chlorophyll,
+        wave_m: observation.wave?.significant_height_m ?? observation.wave,
+        current: observation.current?.direction_cardinal ?? observation.current,
+      })),
+      source: result.source,
+    };
+  }
+
+  if (fnName === 'calculate_pfz_distances') {
+    return {
+      nearest: result.nearest_pfz ? { name: result.nearest_pfz.name, distance_km: result.nearest_pfz.distance_km } : null,
+      candidates: result.candidates?.slice(0, 3).map((c) => ({ name: c.name, distance_km: c.distance_km })),
+    };
+  }
+
+  if (fnName === 'assess_marine_safety') {
+    return {
+      status: result.status,
+      reasons: result.reasons?.slice(0, 2),
+      recommendations_allowed: result.recommendations_allowed,
+    };
+  }
+
+  if (fnName === 'get_fishing_recommendation') {
+    return {
+      score: result.score,
+      selected_pfz: result.selected_pfz?.name,
+      safety_status: result.safety_status,
+      reasons: result.reasons?.slice(0, 2),
+    };
+  }
+
+  return result;
 }
 
 /**
@@ -95,9 +211,22 @@ async function executeTool(toolCall) {
  * @returns {{ reply: string, weatherData: object|null, forecastData: object|null, coordinates: object|null }}
  */
 export async function chat(conversationHistory) {
+  // Keep last 4 turns (2 user + 2 assistant) to save history tokens
+  const rawHistory = conversationHistory.slice(-4);
+
+  // Strip duplicate map context from earlier turns, preserving only the latest user message
+  const recentHistory = rawHistory.map((msg, idx) => {
+    if (idx < rawHistory.length - 1 && msg.role === 'user' && typeof msg.content === 'string') {
+      const cleaned = msg.content.replace(/\n\n\[Selected ORCA marine-map context[^\]]*\]/g, '').trim();
+      return { role: msg.role, content: cleaned };
+    }
+    return msg;
+  });
+
+  const availableTools = toolsForConversation(recentHistory);
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    ...conversationHistory,
+    { role: 'system', content: getSystemPrompt() },
+    ...recentHistory,
   ];
 
   let weatherData = null;
@@ -110,7 +239,7 @@ export async function chat(conversationHistory) {
 
   // Tool-calling loop
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    const response = await callGroq(messages, toolDefinitions);
+    const response = await callGroq(messages, availableTools);
     const choice = response.choices?.[0];
 
     if (!choice) {
@@ -153,7 +282,6 @@ export async function chat(conversationHistory) {
           coordinates = result.coordinates;
         } else if (fnName === 'get_pfz_zones') {
           pfzData = result;
-          // Use first zone's coordinates for map if available
           if (result.zones?.[0]?.coordinates) {
             coordinates = result.zones[0].coordinates;
           }
@@ -169,14 +297,13 @@ export async function chat(conversationHistory) {
           }
         }
 
-        // Add tool result to conversation
+        // Add compact tool result to conversation for LLM
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
+          content: JSON.stringify(compactToolResult(fnName, result)),
         });
       } catch (error) {
-        // Send error back to LLM so it can inform the user gracefully
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -184,9 +311,25 @@ export async function chat(conversationHistory) {
         });
       }
     }
+
+    // Tools have executed. Synthesize final answer immediately without re-sending
+    // the tool definitions, saving ~1,000+ tokens on every response synthesis.
+    const finalResponse = await callGroq(messages);
+    const finalContent = finalResponse.choices?.[0]?.message?.content || "I'm sorry, I couldn't process that request.";
+
+    return {
+      reply: finalContent,
+      weatherData,
+      forecastData,
+      airQualityData,
+      pfzData,
+      oceanData,
+      orchestratorData,
+      coordinates,
+    };
   }
 
-  // If we exhausted iterations, make one final call without tools
+  // Fallback
   const finalResponse = await callGroq(messages);
   const finalContent = finalResponse.choices?.[0]?.message?.content || "I'm sorry, I couldn't process that request.";
 

@@ -59,7 +59,17 @@ export function renderApp(appEl, { onSend, onSuggestion, onMapZoneChange }) {
   chatDrawerEl.innerHTML = `
     <div class="chat-drawer-header">
       <div><span class="chat-drawer-eyebrow">ORCA AI COPILOT</span><strong>Ask ORCA</strong></div>
-      <button class="chat-drawer-close" type="button" aria-label="Close Ask ORCA">×</button>
+      <div class="chat-drawer-header-actions">
+        <button class="chat-drawer-action-btn chat-drawer-fullscreen" type="button" aria-label="Enlarge chat to full screen" title="Enlarge chat to full screen">
+          <svg class="expand-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+          </svg>
+          <svg class="compress-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+            <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/>
+          </svg>
+        </button>
+        <button class="chat-drawer-action-btn chat-drawer-close" type="button" aria-label="Close Ask ORCA" title="Close chat">×</button>
+      </div>
     </div>`;
   chatAreaEl = createChatArea();
   chatDrawerEl.appendChild(chatAreaEl);
@@ -73,7 +83,18 @@ export function renderApp(appEl, { onSend, onSuggestion, onMapZoneChange }) {
   chatToggleEl.setAttribute('aria-expanded', 'false');
   chatToggleEl.addEventListener('click', openChatPanel);
   appEl.appendChild(chatToggleEl);
-  chatDrawerEl.querySelector('.chat-drawer-close').addEventListener('click', closeChatPanel);
+  chatDrawerEl.querySelector('.chat-drawer-fullscreen')?.addEventListener('click', toggleChatFullscreen);
+  chatDrawerEl.querySelector('.chat-drawer-close')?.addEventListener('click', closeChatPanel);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && chatDrawerEl?.classList.contains('is-open')) {
+      if (chatDrawerEl.classList.contains('is-fullscreen')) {
+        toggleChatFullscreen();
+      } else {
+        closeChatPanel();
+      }
+    }
+  });
 
   showWelcome();
   createMarineMap(home, {
@@ -92,7 +113,30 @@ export function openChatPanel() {
   setTimeout(() => inputFieldEl?.focus(), 180);
 }
 
+export function toggleChatFullscreen() {
+  if (!chatDrawerEl) return;
+  const isFullscreen = chatDrawerEl.classList.toggle('is-fullscreen');
+  const expandIcon = chatDrawerEl.querySelector('.expand-icon');
+  const compressIcon = chatDrawerEl.querySelector('.compress-icon');
+  const btn = chatDrawerEl.querySelector('.chat-drawer-fullscreen');
+
+  if (isFullscreen) {
+    btn?.setAttribute('aria-label', 'Exit full screen');
+    if (btn) btn.title = 'Exit full screen';
+    if (expandIcon) expandIcon.style.display = 'none';
+    if (compressIcon) compressIcon.style.display = 'block';
+  } else {
+    btn?.setAttribute('aria-label', 'Enlarge chat to full screen');
+    if (btn) btn.title = 'Enlarge chat to full screen';
+    if (expandIcon) expandIcon.style.display = 'block';
+    if (compressIcon) compressIcon.style.display = 'none';
+  }
+}
+
 function closeChatPanel() {
+  if (chatDrawerEl?.classList.contains('is-fullscreen')) {
+    toggleChatFullscreen();
+  }
   chatDrawerEl?.classList.remove('is-open');
   chatToggleEl?.setAttribute('aria-expanded', 'false');
 }
@@ -330,7 +374,9 @@ function createInputBar() {
   // Auto-resize
   inputFieldEl.addEventListener('input', () => {
     inputFieldEl.style.height = 'auto';
-    inputFieldEl.style.height = Math.min(inputFieldEl.scrollHeight, 120) + 'px';
+    const newHeight = Math.min(inputFieldEl.scrollHeight, 120);
+    inputFieldEl.style.height = newHeight + 'px';
+    inputFieldEl.style.overflowY = inputFieldEl.scrollHeight > 120 ? 'auto' : 'hidden';
   });
 
   // Send on Enter (Shift+Enter for new line)
@@ -365,9 +411,12 @@ function createInputBar() {
   sendBtnEl.setAttribute('aria-label', 'Send message');
   sendBtnEl.addEventListener('click', handleSend);
 
-  bar.appendChild(wrapper);
-  if (micBtnEl) bar.appendChild(micBtnEl);
-  bar.appendChild(sendBtnEl);
+  const container = document.createElement('div');
+  container.className = 'chat-drawer-input-container';
+  container.appendChild(wrapper);
+  if (micBtnEl) container.appendChild(micBtnEl);
+  container.appendChild(sendBtnEl);
+  bar.appendChild(container);
 
   return bar;
 }
@@ -378,6 +427,7 @@ function handleSend() {
 
   inputFieldEl.value = '';
   inputFieldEl.style.height = 'auto';
+  inputFieldEl.style.overflowY = 'hidden';
   onSendCallback(text);
 }
 

@@ -87,21 +87,13 @@ export const agentTools = [
     type: 'function',
     function: {
       name: 'assess_marine_safety',
-      description:
-        'Assess marine safety from existing weather and ocean tool data. Returns SAFE, CAUTION, or UNSAFE. An UNSAFE result is a hard gate: do not make fishing or voyage recommendations.',
+      description: 'Assess marine safety from weather and ocean data. Returns SAFE, CAUTION, or UNSAFE.',
       parameters: {
         type: 'object',
         properties: {
-          weather: {
-            type: 'object',
-            description: 'Existing get_current_weather result containing wind.speed and weather.main or weather.description.',
-          },
-          ocean: {
-            type: 'object',
-            description: 'Existing get_ocean_data observation containing wave.significant_height_m, or its response containing observations.',
-          },
+          weather: { type: 'object', description: 'Weather data with wind and conditions.' },
+          ocean: { type: 'object', description: 'Ocean observation with wave height.' },
         },
-        required: [],
       },
     },
   },

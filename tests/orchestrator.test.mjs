@@ -7,22 +7,22 @@ test('orchestrator passes structured results through the ORCA fishing pipeline',
   const orchestrate = createOrchestrator({
     getPFZ: async ({ state }) => {
       calls.push(`pfz:${state}`);
-      return { zones: [{ id: 'PFZ-MH-001', state: 'Maharashtra' }] };
+      return { zones: [{ id: 'PFZ-MH-001', name: 'Ratnagiri', state: 'Maharashtra', coordinates: { lat: 17, lon: 73.1 }, confidence: 0.78 }] };
     },
     getOcean: async ({ state }) => {
       calls.push(`ocean:${state}`);
-      return { observations: [{ state: 'Maharashtra', wave: { significant_height_m: 1 } }] };
+      return { observations: [{ state: 'Maharashtra', sst: { value: 29 }, chlorophyll: { value: 2 }, wave: { significant_height_m: 1 } }] };
     },
     getWeather: async (city, countryCode) => {
       calls.push(`weather:${city}:${countryCode}`);
-      return { coordinates: { lat: 19.076, lon: 72.8777 }, weather: { main: 'Clear' } };
+      return { coordinates: { lat: 19.076, lon: 72.8777 }, wind: { speed: 4 }, weather: { main: 'Clear' } };
     },
     getGIS: async (input) => {
       calls.push('gis');
       assert.deepEqual(input, {
         latitude: 19.076,
         longitude: 72.8777,
-        pfz_candidates: [{ id: 'PFZ-MH-001', state: 'Maharashtra' }],
+        pfz_candidates: [{ id: 'PFZ-MH-001', name: 'Ratnagiri', state: 'Maharashtra', coordinates: { lat: 17, lon: 73.1 }, confidence: 0.78 }],
         sort: 'asc',
       });
       return { candidates: [{ id: 'PFZ-MH-001', distance_km: 232.034 }], nearest_pfz: { id: 'PFZ-MH-001' } };
@@ -45,7 +45,6 @@ test('orchestrator passes structured results through the ORCA fishing pipeline',
         safety_status: 'SAFE',
       };
     },
-    getMap: async () => ({ zones: [{ id: 'PFZ-MH-001' }] }),
   });
 
   const result = await orchestrate({
@@ -65,5 +64,23 @@ test('orchestrator passes structured results through the ORCA fishing pipeline',
   assert.deepEqual(result.agents_executed, ['pfz', 'ocean', 'weather', 'gis', 'safety', 'recommendation']);
   assert.equal(result.interpreted_request.location.coordinates.lat, 19.076);
   assert.equal(result.recommendation_result.selected_pfz.id, 'PFZ-MH-001');
-  assert.equal(result.map_data.marine_map.zones[0].id, 'PFZ-MH-001');
+  assert.equal(result.map_data.selected_pfz.id, 'PFZ-MH-001');
+});
+
+test('orchestrator resolves today and stale dates to current runtime date', async () => {
+  const today = new Date().toISOString().split('T')[0];
+  const orchestrate = createOrchestrator({
+    getPFZ: async () => ({ zones: [] }),
+    getOcean: async () => ({ observations: [] }),
+    getWeather: async () => ({ coordinates: { lat: 19, lon: 72 } }),
+    getGIS: async () => ({ candidates: [] }),
+    getSafety: async () => ({ status: 'SAFE' }),
+    getRecommendation: async () => ({ score: 0, reasons: [] }),
+  });
+
+  const res1 = await orchestrate({ query: 'fish today', date: 'today', location: { city: 'Mumbai', state: 'Maharashtra' } });
+  assert.equal(res1.interpreted_request.date, today);
+
+  const res2 = await orchestrate({ query: 'fish today', date: '2024-09-18', location: { city: 'Mumbai', state: 'Maharashtra' } });
+  assert.equal(res2.interpreted_request.date, today);
 });

@@ -209,16 +209,15 @@ export const agentTools = [
     type: 'function',
     function: {
       name: 'get_fishing_recommendation',
-      description:
-        'Deterministically score existing PFZ, ocean, weather, GIS, and safety results. PFZ confidence is 30%, chlorophyll 25%, SST 20%, distance 10%, weather 10%, and waves 5%. UNSAFE safety results prohibit recommendations.',
+      description: 'Score PFZ candidates deterministically from PFZ, ocean, weather, GIS, and safety results.',
       parameters: {
         type: 'object',
         properties: {
-          pfz: { type: 'object', description: 'Existing get_pfz_zones result, or one PFZ zone.' },
-          ocean: { type: 'object', description: 'Existing get_ocean_data result, or one ocean observation.' },
-          weather: { type: 'object', description: 'Existing get_current_weather result.' },
-          gis: { type: 'object', description: 'Existing calculate_pfz_distances result.' },
-          safety: { type: 'object', description: 'Existing assess_marine_safety result.' },
+          pfz: { type: 'object' },
+          ocean: { type: 'object' },
+          weather: { type: 'object' },
+          gis: { type: 'object' },
+          safety: { type: 'object' },
         },
         required: ['pfz', 'ocean', 'weather', 'gis', 'safety'],
       },

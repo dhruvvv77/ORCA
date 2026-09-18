@@ -89,50 +89,14 @@ export const agentTools = [
     type: 'function',
     function: {
       name: 'calculate_pfz_distances',
-      description:
-        'Calculate deterministic great-circle distances from a user latitude/longitude to PFZ candidates. Uses existing ORCA PFZ coordinates when candidates are omitted. Returns each candidate distance and the nearest PFZ; no LLM calculation is used.',
+      description: 'Calculate great-circle distances from user coordinates to ORCA PFZ candidates.',
       parameters: {
         type: 'object',
         properties: {
-          latitude: {
-            type: 'number',
-            description: 'User latitude in decimal degrees, from -90 to 90.',
-          },
-          longitude: {
-            type: 'number',
-            description: 'User longitude in decimal degrees, from -180 to 180.',
-          },
-          pfz_candidates: {
-            type: 'array',
-            description:
-              'Optional PFZ candidates. Each candidate can use the ORCA PFZ shape { id, name, state, coordinates: { lat, lon } }. Existing ORCA PFZ zones are used when omitted.',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                name: { type: 'string' },
-                state: { type: 'string' },
-                coordinates: {
-                  type: 'object',
-                  properties: {
-                    lat: { type: 'number' },
-                    lon: { type: 'number' },
-                  },
-                  required: ['lat', 'lon'],
-                },
-              },
-              required: ['coordinates'],
-            },
-          },
-          state: {
-            type: 'string',
-            description: 'Optional state filter when using the existing ORCA PFZ candidates.',
-          },
-          sort: {
-            type: 'string',
-            enum: ['asc', 'desc', 'none'],
-            description: 'Distance ordering for candidates. Defaults to ascending distance.',
-          },
+          latitude: { type: 'number', description: 'User latitude (-90 to 90).' },
+          longitude: { type: 'number', description: 'User longitude (-180 to 180).' },
+          state: { type: 'string', description: 'Optional state filter.' },
+          sort: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order.' },
         },
         required: ['latitude', 'longitude'],
       },

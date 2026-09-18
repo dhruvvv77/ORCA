@@ -15,21 +15,12 @@ export const toolDefinitions = [
     type: 'function',
     function: {
       name: 'get_current_weather',
-      description:
-        'Get the current weather conditions for a specific city. Returns temperature, feels-like, humidity, wind speed, weather description, and more.',
+      description: 'Get current weather conditions for a city.',
       parameters: {
         type: 'object',
         properties: {
-          city: {
-            type: 'string',
-            description:
-              'The city name, e.g. "Mumbai", "New Delhi", "London"',
-          },
-          country_code: {
-            type: 'string',
-            description:
-              'Optional ISO 3166-1 alpha-2 country code, e.g. "IN" for India, "US" for USA. Helps disambiguate city names.',
-          },
+          city: { type: 'string', description: 'City name (e.g. Mumbai).' },
+          country_code: { type: 'string', description: 'Country code (e.g. IN).' },
         },
         required: ['city'],
       },
@@ -39,25 +30,13 @@ export const toolDefinitions = [
     type: 'function',
     function: {
       name: 'get_forecast',
-      description:
-        'Get a multi-day weather forecast for a specific city. Returns daily temperature highs/lows, weather conditions, and precipitation probability for up to 5 days.',
+      description: 'Get 1-5 day weather forecast for a city.',
       parameters: {
         type: 'object',
         properties: {
-          city: {
-            type: 'string',
-            description: 'The city name, e.g. "Bangalore", "Chennai"',
-          },
-          country_code: {
-            type: 'string',
-            description:
-              'Optional ISO 3166-1 alpha-2 country code, e.g. "IN"',
-          },
-          days: {
-            type: 'number',
-            description:
-              'Number of days for the forecast (1-5). Defaults to 5.',
-          },
+          city: { type: 'string', description: 'City name.' },
+          country_code: { type: 'string' },
+          days: { type: 'number', description: 'Days (1-5).' },
         },
         required: ['city'],
       },
@@ -67,20 +46,12 @@ export const toolDefinitions = [
     type: 'function',
     function: {
       name: 'get_air_quality',
-      description:
-        'Get the current Air Quality Index (AQI) and pollutant levels for a specific city. Returns AQI category, PM2.5, PM10, NO2, O3, and other pollutant concentrations.',
+      description: 'Get AQI and pollutant levels for a city.',
       parameters: {
         type: 'object',
         properties: {
-          city: {
-            type: 'string',
-            description: 'The city name to check air quality for.',
-          },
-          country_code: {
-            type: 'string',
-            description:
-              'Optional ISO 3166-1 alpha-2 country code, e.g. "IN"',
-          },
+          city: { type: 'string', description: 'City name.' },
+          country_code: { type: 'string' },
         },
         required: ['city'],
       },
