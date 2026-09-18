@@ -11,9 +11,11 @@ import { registerToolHandlers } from './tools.js';
 import { fetchCurrentWeather, fetchForecast, fetchAirQuality } from './weather.js';
 import { translateText, SUPPORTED_LANGUAGES } from './translate.js';
 import { getMarineMapData } from './marine-map.js';
+import { findAvailablePort } from './port.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const DEFAULT_PORT = Number(process.env.PORT) || 3001;
+let PORT = DEFAULT_PORT;
 
 app.use(cors());
 app.use(express.json());
@@ -114,6 +116,7 @@ app.post('/api/chat', async (req, res) => {
       airQualityData: result.airQualityData,
       pfzData: result.pfzData,
       oceanData: result.oceanData,
+      orchestratorData: result.orchestratorData,
       coordinates: result.coordinates,
     });
   } catch (error) {
@@ -152,45 +155,33 @@ app.post('/api/translate', async (req, res) => {
   }
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`\n⛅ WeatherGPT server running on http://localhost:${PORT}`);
+async function startServer() {
+  PORT = await findAvailablePort(DEFAULT_PORT);
 
-  const groqOk = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here';
-  const owmOk = process.env.OWM_API_KEY && process.env.OWM_API_KEY !== 'your_openweathermap_api_key_here';
+  const server = app.listen(PORT, () => {
+    console.log(`\n⛅ WeatherGPT server running on http://localhost:${PORT}`);
 
-  if (!groqOk || !owmOk) {
-    console.log('\n⚠️  API keys not configured! Add your keys to the .env file:');
-    if (!groqOk) console.log('   - GROQ_API_KEY: Get one free at https://console.groq.com');
-    if (!owmOk) console.log('   - OWM_API_KEY: Get one free at https://home.openweathermap.org/api_keys');
-  } else {
-    console.log('✅ All API keys configured');
-  }
-});
+    const groqOk = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here';
+    const owmOk = process.env.OWM_API_KEY && process.env.OWM_API_KEY !== 'your_openweathermap_api_key_here';
 
-let retryCount = 0;
-const MAX_RETRIES = 3;
-
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    retryCount++;
-    if (retryCount > MAX_RETRIES) {
-      console.error(`\n❌ Port ${PORT} is still in use after ${MAX_RETRIES} retries. Please kill the other process and try again.`);
-      console.error(`   Tip: Run "npx kill-port ${PORT}" or "taskkill /F /PID <PID>"`);
-      process.exit(1);
+    if (!groqOk || !owmOk) {
+      console.log('\n⚠️  API keys not configured! Add your keys to the .env file:');
+      if (!groqOk) console.log('   - GROQ_API_KEY: Get one free at https://console.groq.com');
+      if (!owmOk) console.log('   - OWM_API_KEY: Get one free at https://home.openweathermap.org/api_keys');
+    } else {
+      console.log('✅ All API keys configured');
     }
-    console.warn(`\n⚠️  Port ${PORT} is in use. Retry ${retryCount}/${MAX_RETRIES} in 1 second...`);
-    setTimeout(() => {
-      try { server.close(); } catch (_) {}
-      server.listen(PORT);
-    }, 1000);
-  } else {
-    throw err;
-  }
-});
+  });
 
-process.on('SIGTERM', () => {
-  server.close(() => process.exit(0));
-});
-process.on('SIGINT', () => {
-  server.close(() => process.exit(0));
+  process.on('SIGTERM', () => {
+    server.close(() => process.exit(0));
+  });
+  process.on('SIGINT', () => {
+    server.close(() => process.exit(0));
+  });
+}
+
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });

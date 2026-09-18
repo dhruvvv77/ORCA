@@ -105,6 +105,7 @@ export async function sendMessage(text) {
       forecastData: data.forecastData,
       airQualityData: data.airQualityData,
       pfzData: data.pfzData,
+      orchestratorData: data.orchestratorData,
       coordinates: data.coordinates,
     });
 

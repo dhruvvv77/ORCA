@@ -24,6 +24,7 @@ const SYSTEM_PROMPT = `You are ORCA, a marine ecosystem intelligence assistant b
 - When presenting forecast data, mention that a chart is available for visualization
 - Clearly note when data is from mock/simulated sources
 - When a user message includes a bracketed "Selected ORCA marine-map context", treat it as the currently selected dashboard PFZ. Use its supplied values for zone/species/distance questions; do not invent missing values.
+- For fishing recommendation queries such as "Where can I fish today near Mumbai?", call run_orca_fishing_pipeline rather than separately calculating PFZ, ocean, GIS, safety, or recommendation data. Use location and date from the current message or prior conversation context. Do not call it for weather-only, PFZ-only, or ocean-only queries.
 - You respond in the same language as the user's query when possible`;
 
 function getApiKey() {
@@ -104,6 +105,7 @@ export async function chat(conversationHistory) {
   let airQualityData = null;
   let pfzData = null;
   let oceanData = null;
+  let orchestratorData = null;
   let coordinates = null;
 
   // Tool-calling loop
@@ -126,6 +128,7 @@ export async function chat(conversationHistory) {
         airQualityData,
         pfzData,
         oceanData,
+        orchestratorData,
         coordinates,
       };
     }
@@ -159,6 +162,11 @@ export async function chat(conversationHistory) {
           if (result.observations?.[0]?.coordinates) {
             coordinates = result.observations[0].coordinates;
           }
+        } else if (fnName === 'run_orca_fishing_pipeline') {
+          orchestratorData = result;
+          if (result.interpreted_request?.location?.coordinates) {
+            coordinates = result.interpreted_request.location.coordinates;
+          }
         }
 
         // Add tool result to conversation
@@ -189,6 +197,7 @@ export async function chat(conversationHistory) {
     airQualityData,
     pfzData,
     oceanData,
+    orchestratorData,
     coordinates,
   };
 }

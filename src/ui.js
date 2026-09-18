@@ -462,13 +462,22 @@ export function addMessage(role, content, data = {}) {
     contentWrapper.appendChild(createAQICard(data.airQualityData));
   }
 
+  const orchestratorData = data.orchestratorData;
+  const orchestratorPFZData = orchestratorData?.pfz_result;
+  const selectedRecommendation = orchestratorData?.recommendation_result?.selected_pfz;
+  const mapPFZData = data.pfzData || orchestratorPFZData;
+
   // Map controller instance (for linking PFZ cards to map)
   let mapController = null;
-  const hasMapData = data.coordinates || (data.pfzData && data.pfzData.zones && data.pfzData.zones.length > 0);
+  const hasMapData = data.coordinates || orchestratorData?.map_data?.user_location || (mapPFZData && mapPFZData.zones && mapPFZData.zones.length > 0);
   if (hasMapData) {
-    const mapCoords = data.coordinates || (data.pfzData?.zones?.[0]?.coordinates);
+    const mapCoords = orchestratorData?.map_data?.user_location || data.coordinates || selectedRecommendation?.coordinates || (mapPFZData?.zones?.[0]?.coordinates);
     if (mapCoords) {
-      mapController = createMapToggle(mapCoords, data.weatherData?.city || data.forecastData?.city || '', data.pfzData);
+      mapController = createMapToggle(
+        mapCoords,
+        data.weatherData?.city || data.forecastData?.city || orchestratorData?.weather_result?.city || '',
+        mapPFZData,
+      );
     }
   }
 
@@ -482,6 +491,10 @@ export function addMessage(role, content, data = {}) {
     });
   }
 
+  if (orchestratorData?.recommendation_result) {
+    contentWrapper.appendChild(createRecommendationCard(orchestratorData));
+  }
+
   // Forecast chart
   if (data.forecastData) {
     contentWrapper.appendChild(createForecastChartContainer(data.forecastData));
@@ -490,6 +503,13 @@ export function addMessage(role, content, data = {}) {
   // Map toggle container
   if (mapController) {
     contentWrapper.appendChild(mapController.element);
+    if (selectedRecommendation?.coordinates) {
+      mapController.focusZone(
+        selectedRecommendation.coordinates.lat,
+        selectedRecommendation.coordinates.lon,
+        selectedRecommendation.name,
+      );
+    }
   }
 
   // Follow-up suggestion chips
@@ -921,6 +941,87 @@ function createPFZCard(zone, source, mapController, pfzCardEls) {
         onSuggestionCallback(`What are the wind and ocean conditions at ${zone.name || 'this location'}?`);
       }
     });
+  }
+
+  return card;
+}
+
+function factorValue(factor) {
+  if (!factor) return 'Not available';
+  if (factor.confidence != null) return `${Math.round(factor.confidence * 100)}% confidence`;
+  if (factor.mg_m3 != null) return `${factor.mg_m3} mg/m³`;
+  if (factor.celsius != null) return `${factor.celsius}°C`;
+  if (factor.significant_height_m != null) return `${factor.significant_height_m} m`;
+  if (factor.condition != null) return factor.condition;
+  return 'Not available';
+}
+
+function createRecommendationCard(orchestratorData) {
+  const recommendation = orchestratorData.recommendation_result;
+  const selected = recommendation.selected_pfz;
+  const nearest = orchestratorData.gis_result?.candidates?.find((candidate) => candidate.id === selected?.id)
+    || orchestratorData.gis_result?.nearest_pfz;
+  const factors = recommendation.factors || {};
+  const card = document.createElement('section');
+  card.className = 'recommendation-card';
+
+  const header = document.createElement('div');
+  header.className = 'recommendation-card-header';
+  const title = document.createElement('div');
+  const kicker = document.createElement('span');
+  kicker.className = 'recommendation-kicker';
+  kicker.textContent = 'ORCA FISHING RECOMMENDATION';
+  const zoneName = document.createElement('strong');
+  zoneName.textContent = selected?.name || 'No PFZ recommended';
+  title.append(kicker, zoneName);
+
+  const safety = document.createElement('span');
+  const safetyStatus = recommendation.safety_status || orchestratorData.safety_result?.status || 'UNKNOWN';
+  safety.className = `recommendation-safety recommendation-safety--${safetyStatus.toLowerCase()}`;
+  safety.textContent = safetyStatus;
+  header.append(title, safety);
+  card.appendChild(header);
+
+  const summary = document.createElement('div');
+  summary.className = 'recommendation-summary';
+  const score = document.createElement('div');
+  score.innerHTML = `<span>Suitability</span><strong>${recommendation.score ?? '—'}<small>/100</small></strong>`;
+  const distance = document.createElement('div');
+  distance.innerHTML = `<span>Distance</span><strong>${nearest?.distance_km != null ? `${nearest.distance_km} km` : 'Not available'}</strong>`;
+  summary.append(score, distance);
+  card.appendChild(summary);
+
+  const factorGroups = [
+    ['PFZ', [factors.pfz]],
+    ['Ocean', [factors.chlorophyll, factors.sst, factors.waves]],
+    ['Weather', [factors.weather]],
+  ];
+  const factorGrid = document.createElement('div');
+  factorGrid.className = 'recommendation-factors';
+  factorGroups.forEach(([label, groupFactors]) => {
+    const group = document.createElement('div');
+    group.className = 'recommendation-factor-group';
+    const groupLabel = document.createElement('span');
+    groupLabel.textContent = label;
+    group.appendChild(groupLabel);
+    groupFactors.filter(Boolean).forEach((item) => {
+      const value = document.createElement('div');
+      value.textContent = `${factorValue(item)} · ${item.score}/${item.weight_percent} pts`;
+      group.appendChild(value);
+    });
+    factorGrid.appendChild(group);
+  });
+  card.appendChild(factorGrid);
+
+  if (recommendation.reasons?.length) {
+    const reasons = document.createElement('ul');
+    reasons.className = 'recommendation-reasons';
+    recommendation.reasons.slice(0, 4).forEach((reason) => {
+      const item = document.createElement('li');
+      item.textContent = reason;
+      reasons.appendChild(item);
+    });
+    card.appendChild(reasons);
   }
 
   return card;

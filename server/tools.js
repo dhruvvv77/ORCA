@@ -5,6 +5,10 @@
 
 import { agentTools as pfzTools, agentHandlers as pfzHandlers } from './agents/pfz-agent.js';
 import { agentTools as oceanTools, agentHandlers as oceanHandlers } from './agents/ocean-agent.js';
+import { agentTools as gisTools, agentHandlers as gisHandlers } from './agents/gis-agent.js';
+import { agentTools as safetyTools, agentHandlers as safetyHandlers } from './agents/safety-agent.js';
+import { agentTools as recommendationTools, agentHandlers as recommendationHandlers } from './agents/recommendation-agent.js';
+import { orchestratorTools, orchestratorHandlers } from './orchestrator.js';
 
 export const toolDefinitions = [
   {
@@ -85,6 +89,10 @@ export const toolDefinitions = [
   // ORCA marine agent tools
   ...pfzTools,
   ...oceanTools,
+  ...gisTools,
+  ...safetyTools,
+  ...recommendationTools,
+  ...orchestratorTools,
 ];
 
 /**
@@ -103,4 +111,8 @@ export function registerToolHandlers(handlers) {
   // Register ORCA marine agent handlers
   Object.assign(toolHandlers, pfzHandlers);
   Object.assign(toolHandlers, oceanHandlers);
+  Object.assign(toolHandlers, gisHandlers);
+  Object.assign(toolHandlers, safetyHandlers);
+  Object.assign(toolHandlers, recommendationHandlers);
+  Object.assign(toolHandlers, orchestratorHandlers);
 }
