@@ -95,7 +95,7 @@ function renderMarineMap(container, data, onAskOrca) {
       </div>
       <div class="marine-map-canvas" id="orca-marine-map"></div>
       <div class="marine-map-legend" aria-label="Map legend"><strong>ADVISORY STATUS</strong><span><i class="legend-dot good"></i> Favourable PFZ</span><span><i class="legend-dot caution"></i> Caution</span><span><i class="legend-dot danger"></i> High risk</span><span>🎣 PFZ target</span><span>🚤 Your position</span></div>
-      <div class="marine-map-note">${escapeHtml(data.source)} · updated ${new Date(data.last_updated).toLocaleDateString()}</div>
+      <div class="marine-map-note">${escapeHtml(data.source)} · updated ${data.last_updated ? new Date(data.last_updated).toISOString().slice(0, 10) : 'not supplied'}</div>
     </section>
     <aside class="zone-detail-panel" aria-live="polite">${detailHtml(null)}</aside>`;
 

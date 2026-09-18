@@ -22,6 +22,8 @@ async function loadPFZData() {
   return pfzCache;
 }
 
+import { resolveCoastalState } from './ocean-agent.js';
+
 export const agentName = 'pfz';
 export const agentDescription = 'Provides Potential Fishing Zone (PFZ) advisories for Indian coastal regions based on satellite-derived ocean data.';
 
@@ -30,11 +32,11 @@ export const agentTools = [
     type: 'function',
     function: {
       name: 'get_pfz_zones',
-      description: 'Get Potential Fishing Zone (PFZ) advisories for Indian coastal regions.',
+      description: 'Get Potential Fishing Zone (PFZ) advisories for Indian coastal regions or cities (e.g. Maharashtra, Mumbai, Tamil Nadu, Chennai).',
       parameters: {
         type: 'object',
         properties: {
-          state: { type: 'string', description: 'Indian coastal state (e.g. Maharashtra, Kerala, Tamil Nadu).' },
+          state: { type: 'string', description: 'Indian coastal state or city (e.g. Maharashtra, Mumbai, Tamil Nadu, Chennai).' },
           min_confidence: { type: 'number', description: 'Min confidence score (0-1).' },
         },
         required: [],
@@ -44,16 +46,25 @@ export const agentTools = [
 ];
 
 export const agentHandlers = {
-  get_pfz_zones: async ({ state, min_confidence = 0 }) => {
+  get_pfz_zones: async ({ state, location, city, region, min_confidence = 0 } = {}) => {
     const data = await loadPFZData();
     let zones = data.zones;
 
-    // Filter by state if provided
-    if (state) {
-      const stateNorm = state.toLowerCase().trim();
-      zones = zones.filter(
-        (z) => z.state.toLowerCase().includes(stateNorm)
-      );
+    const rawLocation = (state || location || city || region || '').trim();
+
+    // Filter by state or coastal city if provided
+    if (rawLocation) {
+      const resolvedState = resolveCoastalState(rawLocation);
+      const searchTerms = [
+        rawLocation.toLowerCase(),
+        resolvedState.toLowerCase(),
+      ].filter(Boolean);
+
+      zones = zones.filter((z) => {
+        const zoneState = (z.state || '').toLowerCase();
+        const zoneName = (z.name || '').toLowerCase();
+        return searchTerms.some((term) => zoneState.includes(term) || zoneName.includes(term));
+      });
     }
 
     // Filter by minimum confidence
@@ -64,7 +75,7 @@ export const agentHandlers = {
     if (zones.length === 0) {
       return {
         found: false,
-        message: `No PFZ zones found${state ? ` for ${state}` : ''} with confidence ≥ ${min_confidence}.`,
+        message: `No PFZ zones found${rawLocation ? ` for ${rawLocation}` : ''} with confidence ≥ ${min_confidence}.`,
         source: 'ORCA Mock Data (simulated INCOIS PFZ advisory)',
       };
     }

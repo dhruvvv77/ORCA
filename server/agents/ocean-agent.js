@@ -25,16 +25,117 @@ async function loadOceanData() {
 export const agentName = 'ocean';
 export const agentDescription = 'Provides ocean observation data including Sea Surface Temperature (SST), Chlorophyll-a concentration, wave height, and ocean currents for Indian coastal waters.';
 
+export const COASTAL_CITY_TO_STATE = {
+  // Tamil Nadu
+  chennai: 'Tamil Nadu',
+  madras: 'Tamil Nadu',
+  tuticorin: 'Tamil Nadu',
+  thoothukudi: 'Tamil Nadu',
+  rameswaram: 'Tamil Nadu',
+  cuddalore: 'Tamil Nadu',
+  kanyakumari: 'Tamil Nadu',
+  nagapattinam: 'Tamil Nadu',
+  ennore: 'Tamil Nadu',
+
+  // Maharashtra
+  mumbai: 'Maharashtra',
+  bombay: 'Maharashtra',
+  ratnagiri: 'Maharashtra',
+  alibag: 'Maharashtra',
+  malvan: 'Maharashtra',
+  sindhudurg: 'Maharashtra',
+  palghar: 'Maharashtra',
+  raigad: 'Maharashtra',
+  dahanu: 'Maharashtra',
+  jnpt: 'Maharashtra',
+
+  // Kerala
+  kochi: 'Kerala',
+  cochin: 'Kerala',
+  trivandrum: 'Kerala',
+  thiruvananthapuram: 'Kerala',
+  calicut: 'Kerala',
+  kozhikode: 'Kerala',
+  kollam: 'Kerala',
+  quilon: 'Kerala',
+  alappuzha: 'Kerala',
+  alleppey: 'Kerala',
+  kannur: 'Kerala',
+  vizhinjam: 'Kerala',
+
+  // Goa
+  panaji: 'Goa',
+  panjim: 'Goa',
+  vasco: 'Goa',
+  mormugao: 'Goa',
+  margao: 'Goa',
+
+  // Karnataka
+  mangalore: 'Karnataka',
+  mangaluru: 'Karnataka',
+  karwar: 'Karnataka',
+  udupi: 'Karnataka',
+  malpe: 'Karnataka',
+
+  // Gujarat
+  porbandar: 'Gujarat',
+  veraval: 'Gujarat',
+  okha: 'Gujarat',
+  surat: 'Gujarat',
+  kandla: 'Gujarat',
+  bhavnagar: 'Gujarat',
+  mandvi: 'Gujarat',
+  dwarka: 'Gujarat',
+  mundra: 'Gujarat',
+  jafrabad: 'Gujarat',
+
+  // Andhra Pradesh
+  visakhapatnam: 'Andhra Pradesh',
+  vizag: 'Andhra Pradesh',
+  kakinada: 'Andhra Pradesh',
+  machilipatnam: 'Andhra Pradesh',
+  krishnapatnam: 'Andhra Pradesh',
+  bhavanapadu: 'Andhra Pradesh',
+
+  // Odisha
+  puri: 'Odisha',
+  paradip: 'Odisha',
+  paradeep: 'Odisha',
+  gopalpur: 'Odisha',
+  dhamra: 'Odisha',
+  chandipur: 'Odisha',
+
+  // West Bengal
+  kolkata: 'West Bengal',
+  calcutta: 'West Bengal',
+  haldia: 'West Bengal',
+  digha: 'West Bengal',
+};
+
+export function resolveCoastalState(input) {
+  if (!input || typeof input !== 'string') return '';
+  const clean = input.toLowerCase().trim();
+  if (COASTAL_CITY_TO_STATE[clean]) {
+    return COASTAL_CITY_TO_STATE[clean];
+  }
+  for (const [city, state] of Object.entries(COASTAL_CITY_TO_STATE)) {
+    if (clean.includes(city)) {
+      return state;
+    }
+  }
+  return input.trim();
+}
+
 export const agentTools = [
   {
     type: 'function',
     function: {
       name: 'get_ocean_data',
-      description: 'Get ocean observation data (SST, chlorophyll, wave height, currents) for Indian coastal regions.',
+      description: 'Get ocean observation data (SST, chlorophyll, wave height, currents) for Indian coastal regions or cities (e.g. Chennai, Tamil Nadu, Mumbai, Maharashtra).',
       parameters: {
         type: 'object',
         properties: {
-          state: { type: 'string', description: 'Indian coastal state (e.g. Tamil Nadu, Kerala, Maharashtra).' },
+          state: { type: 'string', description: 'Indian coastal state or city (e.g. Tamil Nadu, Chennai, Maharashtra, Mumbai).' },
           parameter: { type: 'string', enum: ['sst', 'chlorophyll', 'wave', 'current', 'all'] },
         },
         required: [],
@@ -44,23 +145,31 @@ export const agentTools = [
 ];
 
 export const agentHandlers = {
-  get_ocean_data: async ({ state, parameter = 'all' }) => {
+  get_ocean_data: async ({ state, location, city, region, parameter = 'all' } = {}) => {
     const data = await loadOceanData();
     let observations = data.observations;
 
-    // Filter by state
-    if (state) {
-      const stateNorm = state.toLowerCase().trim();
-      observations = observations.filter(
-        (o) => o.state.toLowerCase().includes(stateNorm) ||
-               o.region.toLowerCase().includes(stateNorm)
-      );
+    const rawLocation = (state || location || city || region || '').trim();
+
+    // Filter by state or coastal city
+    if (rawLocation) {
+      const resolvedState = resolveCoastalState(rawLocation);
+      const searchTerms = [
+        rawLocation.toLowerCase(),
+        resolvedState.toLowerCase(),
+      ].filter(Boolean);
+
+      observations = observations.filter((o) => {
+        const obsState = (o.state || '').toLowerCase();
+        const obsRegion = (o.region || '').toLowerCase();
+        return searchTerms.some((term) => obsState.includes(term) || obsRegion.includes(term));
+      });
     }
 
     if (observations.length === 0) {
       return {
         found: false,
-        message: `No ocean data found${state ? ` for ${state}` : ''}.`,
+        message: `No ocean data found${rawLocation ? ` for ${rawLocation}` : ''}.`,
         source: 'ORCA Mock Data (simulated INCOIS/ISRO ocean observations)',
       };
     }

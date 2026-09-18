@@ -4,6 +4,8 @@
  */
 
 import { toolDefinitions, toolHandlers } from './tools.js';
+import { translateText } from './translate.js';
+import { COASTAL_CITY_TO_STATE, resolveCoastalState } from './agents/ocean-agent.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'openai/gpt-oss-120b';
@@ -11,9 +13,14 @@ const MAX_TOOL_ITERATIONS = 2;
 
 function getSystemPrompt() {
   const today = new Date().toISOString().split('T')[0];
-  return `You are ORCA, a concise marine assistant for Indian fishers. Today is ${today}. Use tool data exactly; never invent measurements. Explain weather, ocean, and PFZ data practically, noting mock data when supplied. Mention PFZ confidence, species, and safety when available; mention maps or charts when data includes them. Use the user's language when possible. Treat selected marine-map context as factual.
+  return `You are ORCA, a concise marine assistant for Indian fishers. Today is ${today}. Use tool data exactly; never invent measurements. Explain weather, ocean, and PFZ data practically. Mention maps or charts when data includes them. Use the user's language when possible. Treat selected marine-map context as factual.
 
-For a fishing recommendation (for example, "Where can I fish today near Mumbai?"), call run_orca_fishing_pipeline once, using location (city and state, e.g. Mumbai is in Maharashtra) and date "${today}". Do not separately call PFZ, ocean, GIS, safety, or recommendation tools. Do not use the pipeline for weather-only, PFZ-only, or ocean-only requests.`;
+Strict Routing Rules:
+- Before answering a classified weather, PFZ, ocean, or fishing recommendation query, make the matching tool call. Do not answer from general knowledge when that tool is available.
+- Weather queries (e.g. "weather in Mumbai") -> call get_current_weather. NEVER use run_orca_fishing_pipeline.
+- PFZ queries (e.g. "Show PFZ zones in Maharashtra") -> call get_pfz_zones. NEVER use run_orca_fishing_pipeline.
+- Ocean queries (e.g. "What are ocean conditions near Chennai?") -> call get_ocean_data. NEVER use run_orca_fishing_pipeline.
+- Fishing recommendation queries (e.g. "Where can I fish today near Mumbai?") -> call run_orca_fishing_pipeline with location (city and state) and date "${today}".`;
 }
 
 function getApiKey() {
@@ -27,7 +34,7 @@ function getApiKey() {
 /**
  * Send a chat completion request to Groq.
  */
-async function callGroq(messages, tools = null) {
+async function callGroq(messages, tools = null, toolChoice = 'auto') {
   const apiKey = getApiKey();
 
   const body = {
@@ -39,7 +46,7 @@ async function callGroq(messages, tools = null) {
 
   if (tools && tools.length > 0) {
     body.tools = tools;
-    body.tool_choice = 'auto';
+    body.tool_choice = toolChoice;
   }
 
   const res = await fetch(GROQ_API_URL, {
@@ -60,17 +67,135 @@ async function callGroq(messages, tools = null) {
   return res.json();
 }
 
-function isFishingRecommendationQuery(conversationHistory) {
-  const latestUserMessage = [...conversationHistory].reverse().find((message) => message.role === 'user')?.content || '';
-  return /\b(fish|fishing|angling)\b/i.test(latestUserMessage)
-    && /\b(where|which|recommend|suitable|safe|should|today|near)\b/i.test(latestUserMessage);
+export function extractUserQuery(rawContent) {
+  if (!rawContent || typeof rawContent !== 'string') return '';
+  return rawContent.split('\n\n[Selected ORCA marine-map context')[0].trim();
 }
 
-function toolsForConversation(conversationHistory) {
-  if (isFishingRecommendationQuery(conversationHistory)) {
-    return toolDefinitions.filter((tool) => tool.function.name === 'run_orca_fishing_pipeline');
+export function classifyQueryIntent(text) {
+  const clean = extractUserQuery(text).toLowerCase();
+
+  // 1. Fishing recommendation intent: asks where/whether to fish
+  const hasFishWord = /\b(fish|fishing|angling|machli|machhli|pakadna|pakadne)\b|मछली|पकड़/i.test(clean);
+  const hasRecommendationIntent = /\b(where|which|recommend|recommendation|suitable|should|can i|trip|best place|best spot|good to|kahan|kahaan|jagah|jgh|aas pas|as pas)\b|कहाँ|जगह/i.test(clean);
+
+  if (hasFishWord && hasRecommendationIntent) {
+    return 'fishing_recommendation';
   }
-  return toolDefinitions.filter((tool) => tool.function.name !== 'run_orca_fishing_pipeline');
+
+  // 2. Weather-only: asks about weather, forecast, rain, temp, aqi without asking where to fish
+  const isWeatherWord = /\b(weather|forecast|rain|raining|temp|temperature|climate|wind|humidity|aqi|air quality|mausam)\b|मौसम/i.test(clean);
+  if (isWeatherWord && !hasFishWord) {
+    return 'weather_only';
+  }
+
+  // 3. PFZ-only: asks specifically about PFZ / fishing zones
+  const isPFZWord = /\b(pfz|potential fishing zone|fishing zone|fishing zones|zones)\b/i.test(clean);
+  if (isPFZWord && !hasRecommendationIntent) {
+    return 'pfz_only';
+  }
+
+  // 4. Ocean-only: asks about ocean conditions, wave, SST, chlorophyll, currents
+  const isOceanWord = /\b(ocean|sea|marine condition|wave|waves|sst|chlorophyll|current|currents|swell|water temp|salinity)\b/i.test(clean);
+  if (isOceanWord && !hasFishWord && !isPFZWord) {
+    return 'ocean_only';
+  }
+
+  if (hasFishWord) {
+    return 'fishing_recommendation';
+  }
+
+  return 'general';
+}
+
+export function toolsForConversation(conversationHistory) {
+  const latestUserMessage = [...conversationHistory].reverse().find((m) => m.role === 'user')?.content || '';
+  const intent = classifyQueryIntent(latestUserMessage);
+
+  switch (intent) {
+    case 'weather_only':
+      return toolDefinitions.filter((t) => t.function.name === 'get_current_weather');
+    case 'pfz_only':
+      return toolDefinitions.filter((t) => t.function.name === 'get_pfz_zones');
+    case 'ocean_only':
+      return toolDefinitions.filter((t) => t.function.name === 'get_ocean_data');
+    case 'fishing_recommendation':
+      return toolDefinitions.filter((t) => t.function.name === 'run_orca_fishing_pipeline');
+    default:
+      return toolDefinitions.filter((t) =>
+        ['get_current_weather', 'get_forecast', 'get_air_quality', 'get_pfz_zones', 'get_ocean_data'].includes(t.function.name)
+      );
+  }
+}
+
+function locationFromQuery(query) {
+  const clean = extractUserQuery(query);
+  const match = clean.match(/\b(?:in|near|at|around|for)\s+([^?!,.]+)/i);
+  if (match?.[1]) {
+    return match[1].replace(/\b(?:today|tomorrow|please)\b/gi, '').trim();
+  }
+
+  const normalized = clean.toLowerCase();
+  return Object.keys(COASTAL_CITY_TO_STATE).find((city) => normalized.includes(city)) || null;
+}
+
+function fallbackToolCall(intent, query) {
+  const location = locationFromQuery(query);
+  const id = `route-${intent}`;
+
+  if (intent === 'weather_only' && location) {
+    return {
+      id,
+      type: 'function',
+      function: {
+        name: 'get_current_weather',
+        arguments: JSON.stringify({ city: location, country_code: 'IN' }),
+      },
+    };
+  }
+
+  if (intent === 'pfz_only' && location) {
+    return {
+      id,
+      type: 'function',
+      function: {
+        name: 'get_pfz_zones',
+        arguments: JSON.stringify({ state: location }),
+      },
+    };
+  }
+
+  if (intent === 'ocean_only' && location) {
+    return {
+      id,
+      type: 'function',
+      function: {
+        name: 'get_ocean_data',
+        arguments: JSON.stringify({ state: location, parameter: 'all' }),
+      },
+    };
+  }
+
+  if (intent === 'fishing_recommendation' && location) {
+    return {
+      id,
+      type: 'function',
+      function: {
+        name: 'run_orca_fishing_pipeline',
+        arguments: JSON.stringify({
+          query: extractUserQuery(query),
+          date: new Date().toISOString().split('T')[0],
+          location: {
+            city: location,
+            state: resolveCoastalState(location),
+            country_code: 'IN',
+          },
+        }),
+      },
+    };
+  }
+
+  return null;
 }
 
 function compactToolResult(fnName, result) {
@@ -148,13 +273,16 @@ function compactToolResult(fnName, result) {
   if (fnName === 'get_ocean_data') {
     return {
       found: result.found,
+      message: result.message,
       observations: result.observations?.slice(0, 3).map((observation) => ({
         region: observation.region,
         state: observation.state,
         sst: observation.sst?.value ?? observation.sst,
         chlorophyll: observation.chlorophyll?.value ?? observation.chlorophyll,
         wave_m: observation.wave?.significant_height_m ?? observation.wave,
-        current: observation.current?.direction_cardinal ?? observation.current,
+        current: observation.current?.speed_knots != null
+          ? `${observation.current.speed_knots}kt ${observation.current.direction || ''}`.trim()
+          : (observation.current?.direction_cardinal ?? observation.current),
       })),
       source: result.source,
     };
@@ -190,7 +318,7 @@ function compactToolResult(fnName, result) {
 /**
  * Execute a tool call by name with the given arguments.
  */
-async function executeTool(toolCall) {
+async function executeTool(toolCall, queryIntent) {
   const fnName = toolCall.function.name;
   const args = JSON.parse(toolCall.function.arguments);
   const handler = toolHandlers[fnName];
@@ -199,9 +327,55 @@ async function executeTool(toolCall) {
     throw new Error(`Unknown tool: ${fnName}`);
   }
 
+  if (fnName === 'run_orca_fishing_pipeline' && queryIntent && queryIntent !== 'fishing_recommendation') {
+    throw new Error('run_orca_fishing_pipeline cannot be used for weather-only, PFZ-only, or ocean-only queries.');
+  }
+
   console.log(`  ↳ Calling tool: ${fnName}(${JSON.stringify(args)})`);
   const result = await handler(args);
   return { result, fnName, args };
+}
+
+async function synthesizeToolReply(messages, availableTools, queryIntent) {
+  messages.push({
+    role: 'system',
+    content: 'The required tool data is already available. Respond with the final answer in plain text, using that data. Do not call a tool unless essential data is still missing.',
+  });
+
+  // Keep tool_choice automatic for every Groq request. If the model still asks
+  // for more data, execute that valid call and give it one more chance to reply.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await callGroq(messages, availableTools);
+    const assistantMessage = response.choices?.[0]?.message;
+
+    if (!assistantMessage) {
+      throw new Error('No response from Groq');
+    }
+
+    if (!assistantMessage.tool_calls?.length) {
+      return assistantMessage.content || "I'm sorry, I couldn't process that request.";
+    }
+
+    messages.push(assistantMessage);
+    for (const toolCall of assistantMessage.tool_calls) {
+      try {
+        const { result, fnName } = await executeTool(toolCall, queryIntent);
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(compactToolResult(fnName, result)),
+        });
+      } catch (error) {
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify({ error: error.message }),
+        });
+      }
+    }
+  }
+
+  return "I'm sorry, I couldn't process that request.";
 }
 
 /**
@@ -210,7 +384,7 @@ async function executeTool(toolCall) {
  * @param {Array} conversationHistory - Array of {role, content} messages
  * @returns {{ reply: string, weatherData: object|null, forecastData: object|null, coordinates: object|null }}
  */
-export async function chat(conversationHistory) {
+export async function chat(conversationHistory, inputLanguage = 'en') {
   // Keep last 4 turns (2 user + 2 assistant) to save history tokens
   const rawHistory = conversationHistory.slice(-4);
 
@@ -223,7 +397,9 @@ export async function chat(conversationHistory) {
     return msg;
   });
 
+  const latestUserMessage = [...recentHistory].reverse().find((m) => m.role === 'user')?.content || '';
   const availableTools = toolsForConversation(recentHistory);
+  const queryIntent = classifyQueryIntent(latestUserMessage);
   const messages = [
     { role: 'system', content: getSystemPrompt() },
     ...recentHistory,
@@ -246,19 +422,30 @@ export async function chat(conversationHistory) {
       throw new Error('No response from Groq');
     }
 
-    const assistantMessage = choice.message;
+    let assistantMessage = choice.message;
 
-    // If no tool calls, we have our final answer
+    // Groq is allowed to choose tools automatically, but a classified request
+    // must still be grounded in its route's data source when it skips a call.
     if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
-      return {
-        reply: assistantMessage.content,
-        weatherData,
-        forecastData,
-        airQualityData,
-        pfzData,
-        oceanData,
-        orchestratorData,
-        coordinates,
+      const routedToolCall = fallbackToolCall(queryIntent, latestUserMessage);
+      if (!routedToolCall) {
+        return {
+          reply: assistantMessage.content,
+          weatherData,
+          forecastData,
+          airQualityData,
+          pfzData,
+          oceanData,
+          orchestratorData,
+          coordinates,
+        };
+      }
+
+      console.warn(`  ↳ Groq skipped tool use; routing to ${routedToolCall.function.name}`);
+      assistantMessage = {
+        role: 'assistant',
+        content: null,
+        tool_calls: [routedToolCall],
       };
     }
 
@@ -268,7 +455,7 @@ export async function chat(conversationHistory) {
     // Execute each tool call
     for (const toolCall of assistantMessage.tool_calls) {
       try {
-        const { result, fnName } = await executeTool(toolCall);
+        const { result, fnName } = await executeTool(toolCall, queryIntent);
 
         // Track data for frontend rendering
         if (fnName === 'get_current_weather') {
@@ -312,10 +499,7 @@ export async function chat(conversationHistory) {
       }
     }
 
-    // Tools have executed. Synthesize final answer immediately without re-sending
-    // the tool definitions, saving ~1,000+ tokens on every response synthesis.
-    const finalResponse = await callGroq(messages);
-    const finalContent = finalResponse.choices?.[0]?.message?.content || "I'm sorry, I couldn't process that request.";
+    const finalContent = await synthesizeToolReply(messages, availableTools, queryIntent);
 
     return {
       reply: finalContent,

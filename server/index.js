@@ -98,7 +98,7 @@ app.post('/api/chat', async (req, res) => {
     conversationHistory.push({ role: 'user', content: `${englishMessage}${mapContextText}` });
 
     // Step 3: Run the LLM with tool-calling
-    const result = await chat(conversationHistory);
+    const result = await chat(conversationHistory, language);
     console.log(`  ↳ Assistant: ${result.reply?.substring(0, 100)}...`);
 
     // Step 4: Translate response back to user's language
