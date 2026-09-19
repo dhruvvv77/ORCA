@@ -1,5 +1,5 @@
 /**
- * WeatherGPT — App Entry Point
+ * ORCA — App Entry Point
  * Initializes all modules and wires them together.
  */
 
@@ -22,13 +22,9 @@ async function init() {
     const health = await healthRes.json();
 
     if (!health.keys?.groq || !health.keys?.owm) {
-      // The command map is powered by the existing local mock advisories and
-      // remains demo-ready without keys. Chat will retain its existing setup
-      // error if an API-backed question is sent before keys are configured.
       console.warn('Some API keys are missing; map demo remains available.');
     }
   } catch (err) {
-    // Server not running — still render the app, errors will show in chat
     console.warn('Health check failed — server may not be running:', err.message);
   }
 
@@ -42,20 +38,17 @@ async function init() {
   // Initialize speech recognition
   if (isSpeechSupported()) {
     initSpeechRecognition(
-      // On transcript received
       (transcript) => {
         setInputValue(transcript);
-        // Auto-send after voice input
         sendMessage(transcript);
       },
-      // On status change
       (status) => {
         updateMicState(status);
       }
     );
   }
 
-  console.log('🌊 ORCA initialized');
+  console.log('🌊 ORCA Marine Intelligence initialized');
 }
 
 // Boot when DOM is ready

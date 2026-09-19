@@ -1,6 +1,7 @@
 /**
- * ORCA home map.  The data is served by /api/marine-map, which composes the
+ * ORCA home map. The data is served by /api/marine-map, which composes the
  * existing PFZ, ocean and GIS mock advisories on the server.
+ * Premium marine operations map with basemap switcher, layer controls, and legends.
  */
 
 let activeZone = null;
@@ -9,7 +10,7 @@ let mapContextCallback = null;
 
 const indianWestCoast = [15.5, 76.2];
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  '&': '&', '<': '<', '>': '>', "'": "'", '"': '"',
 }[char]));
 
 function distanceKm(from, to) {
@@ -21,7 +22,6 @@ function distanceKm(from, to) {
 }
 
 function scoreZone(zone) {
-  // This deliberately uses only fields already supplied by the PFZ/ocean mock data.
   const safety = zone.risk.level === 'favourable' ? 20 : zone.risk.level === 'caution' ? 5 : -30;
   const wave = zone.ocean?.wave?.significant_height_m || 0;
   return (zone.confidence * 100) + safety - (zone.wind_speed_knots * 0.35) - (wave * 2);
@@ -122,79 +122,129 @@ export async function createMarineMap(container, { onAskOrca, onZoneChange } = {
 function renderMarineMap(container, data, onAskOrca) {
   container.innerHTML = `
     <section class="marine-map-card" aria-label="ORCA marine operations map">
-      <header class="marine-map-header">
-        <div class="map-header-branding">
-          <div class="eyebrow">ORCA OPERATIONS · MARITIME INTELLIGENCE</div>
-          <div class="map-title-row">
-            <h1>Marine Operations Map</h1>
-            <div class="map-status-strip">
-              <span class="status-chip"><b class="dot pfz">●</b> ${data.zones.length} PFZ Zones</span>
-              <span class="status-chip"><b class="dot ocean">◌</b> ${data.ocean_conditions?.length || 0} Ocean Sectors</span>
-              <span class="status-chip"><b class="dot alert">⚠</b> ${data.marine_alerts?.length || 0} Alerts</span>
-            </div>
-          </div>
-        </div>
-        <div class="map-header-controls">
-          <div class="map-search-bar">
-            <input class="map-search-input" type="search" placeholder="Search zone or state..." aria-label="Search map regions">
-            <button type="button" class="map-search-button">Search</button>
-          </div>
-          <div class="map-quick-actions">
-            <label class="map-basemap-picker" title="Switch basemap">
-              <span class="basemap-icon">🗺️</span>
-              <select class="map-basemap" aria-label="Map basemap">
-                <option value="standard">Standard</option>
-                <option value="satellite">Satellite</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="terrain">Terrain</option>
-              </select>
-            </label>
-            <button type="button" class="map-action-btn map-locate" title="Find my location">📍 Locate me</button>
-            <button type="button" class="map-action-btn map-reset" title="Reset map view">↺ Reset</button>
-            <button type="button" class="map-action-btn best-zone" title="Find highest-scoring fishing zone">🎯 Best Zone</button>
-          </div>
-        </div>
-      </header>
-      <div class="marine-map-viewport">
-        <div class="marine-map-canvas" id="orca-marine-map"></div>
-        <div class="map-layer-toolbar" role="group" aria-label="Toggle map layers">
-          <span class="toolbar-label">Layers:</span>
-          <button type="button" class="map-layer-button is-active" data-layer="pfz" aria-pressed="true">🎣 PFZ</button>
-          <button type="button" class="map-layer-button is-active" data-layer="ocean" aria-pressed="true">🌊 Ocean</button>
-          <button type="button" class="map-layer-button is-active" data-layer="alerts" aria-pressed="true">⚠️ Alerts</button>
-          <button type="button" class="map-layer-button" data-layer="weather" aria-pressed="false">☁️ Weather</button>
-        </div>
-        <div class="marine-map-legend-widget">
-          <button type="button" class="legend-toggle-btn" aria-expanded="false" aria-label="Toggle map legend">
-            <span class="legend-quick-indicators">
-              <i class="legend-dot good"></i> Favourable
-              <i class="legend-dot caution"></i> Caution
-              <i class="legend-dot danger"></i> High Risk
-            </span>
-            <span class="legend-toggle-label">Legend <span class="toggle-arrow">▾</span></span>
+      <div class="marine-map-canvas" id="orca-marine-map"></div>
+      
+      <!-- Top Floating Control Bar (Clean & Compact) -->
+      <div class="map-top-bar" role="toolbar" aria-label="Map navigation tools">
+        <!-- Layer Dropdown Pill -->
+        <div class="map-control-dropdown" id="layer-dropdown-container">
+          <button type="button" class="map-pill-btn" id="layer-pill-btn" aria-expanded="false" aria-label="Toggle layer visibility" title="Manage Map Layers">
+            <span class="pill-icon">🥞</span>
+            <span class="pill-text">Layers</span>
+            <span class="pill-badge" id="active-layers-badge">4</span>
+            <span class="pill-chevron">▾</span>
           </button>
-          <div class="legend-expanded-popover">
-            <div class="legend-section-title">ADVISORY STATUS</div>
-            <div class="legend-grid">
-              <span><i class="legend-dot good"></i> Favourable PFZ / calm</span>
-              <span><i class="legend-dot caution"></i> Caution / moderate swell</span>
-              <span><i class="legend-dot danger"></i> High risk / rough waves</span>
-              <span><i class="legend-dot warning"></i> Marine Warning</span>
-              <span><i class="legend-dot info"></i> Advisory Info</span>
-              <span>🎣 PFZ Target</span>
-              <span>🌊 Ocean Station</span>
-              <span>⚠️ Marine Alert</span>
-              <span>🚤 GPS Location</span>
+          
+          <div class="map-dropdown-menu map-layer-menu" id="layer-dropdown-menu" role="dialog" aria-label="Layer toggles">
+            <div class="dropdown-header">
+              <span class="dropdown-title">MAP LAYERS</span>
+              <button type="button" class="dropdown-close-btn" id="close-layers-btn" aria-label="Close layers menu" title="Close layers">✕</button>
+            </div>
+            <div class="dropdown-body">
+              <button type="button" class="map-layer-btn is-active" data-layer="pfz" aria-pressed="true">
+                <span class="layer-icon">🎣</span> PFZ Zones
+                <span class="layer-status"></span>
+              </button>
+              <button type="button" class="map-layer-btn is-active" data-layer="ocean" aria-pressed="true">
+                <span class="layer-icon">🌊</span> Ocean Conditions
+                <span class="layer-status"></span>
+              </button>
+              <button type="button" class="map-layer-btn is-active" data-layer="alerts" aria-pressed="true">
+                <span class="layer-icon">⚠️</span> Marine Alerts
+                <span class="layer-status"></span>
+              </button>
+              <button type="button" class="map-layer-btn" data-layer="weather" aria-pressed="false">
+                <span class="layer-icon">☁️</span> Wind Layer
+                <span class="layer-status"></span>
+              </button>
+              <button type="button" class="map-layer-btn is-active" data-layer="location" aria-pressed="true">
+                <span class="layer-icon">🚤</span> My Location
+                <span class="layer-status"></span>
+              </button>
             </div>
           </div>
         </div>
-        <div class="map-control-status" aria-live="polite">Standard basemap active</div>
+
+        <!-- Basemap Dropdown Pill -->
+        <div class="map-control-dropdown" id="basemap-dropdown-container">
+          <button type="button" class="map-pill-btn" id="basemap-pill-btn" aria-expanded="false" aria-label="Switch map style" title="Change Basemap Style">
+            <span class="pill-icon" id="basemap-pill-icon">🗺️</span>
+            <span class="pill-text" id="basemap-pill-text">Standard</span>
+            <span class="pill-chevron">▾</span>
+          </button>
+          
+          <div class="map-dropdown-menu map-basemap-menu" id="basemap-dropdown-menu" role="dialog" aria-label="Basemap switcher">
+            <div class="dropdown-header">
+              <span class="dropdown-title">BASEMAP</span>
+              <button type="button" class="dropdown-close-btn" id="close-basemap-btn" aria-label="Close basemap menu" title="Close menu">✕</button>
+            </div>
+            <div class="dropdown-body">
+              <button type="button" class="basemap-btn active" data-basemap="standard">
+                <span class="basemap-icon">🗺️</span> Standard
+              </button>
+              <button type="button" class="basemap-btn" data-basemap="satellite">
+                <span class="basemap-icon">🛰️</span> Satellite
+              </button>
+              <button type="button" class="basemap-btn" data-basemap="hybrid">
+                <span class="basemap-icon">🗺️🛰️</span> Hybrid
+              </button>
+              <button type="button" class="basemap-btn" data-basemap="terrain">
+                <span class="basemap-icon">⛰️</span> Terrain
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Bar with Clear Button -->
+        <div class="map-search-control" role="search">
+          <span class="map-search-icon">🔍</span>
+          <input class="map-search-input" type="search" placeholder="Search zone, state, region..." aria-label="Search map regions">
+          <button type="button" class="map-search-clear" id="search-clear-btn" aria-label="Clear search text" title="Clear" style="display:none;">✕</button>
+        </div>
       </div>
-      <footer class="marine-map-footer">
-        <span class="map-note">Simulated INCOIS/ISRO telemetry · Updated ${data.last_updated ? new Date(data.last_updated).toISOString().slice(0, 10) : 'recent'}</span>
-      </footer>
+
+      <!-- Map Action Floating Controls -->
+      <div class="map-actions-control" role="group" aria-label="Map actions">
+        <button type="button" class="map-action-btn map-locate" title="Find my GPS location" aria-label="Find my location">📍</button>
+        <button type="button" class="map-action-btn map-reset" title="Reset map view" aria-label="Reset view">↺</button>
+        <button type="button" class="map-action-btn primary best-zone" title="Highlight best fishing zone" aria-label="Find best zone">🎯</button>
+        <button type="button" class="map-action-btn map-zen-btn" id="map-zen-btn" title="Toggle Clean Map view (hide/show panels)" aria-label="Toggle clean view">👁️</button>
+      </div>
+
+      <!-- Legend Widget (Collapsible with close button) -->
+      <div class="map-legend-widget" id="map-legend-widget">
+        <button type="button" class="legend-toggle-btn" aria-expanded="false" aria-label="Toggle map legend">
+          <span class="legend-quick-indicators">
+            <i class="legend-dot good"></i> Favourable
+            <i class="legend-dot caution"></i> Caution
+            <i class="legend-dot danger"></i> High Risk
+          </span>
+          <span class="legend-toggle-label">Legend <span class="toggle-arrow">▾</span></span>
+        </button>
+        <div class="legend-expanded-popover">
+          <div class="legend-popover-header">
+            <div class="legend-section-title">ADVISORY STATUS</div>
+            <button type="button" class="dropdown-close-btn legend-close-btn" id="legend-close-btn" aria-label="Close legend" title="Close legend">✕</button>
+          </div>
+          <div class="legend-grid">
+            <span><i class="legend-dot good"></i> Favourable PFZ / Calm</span>
+            <span><i class="legend-dot caution"></i> Caution / Moderate Swell</span>
+            <span><i class="legend-dot danger"></i> High Risk / Rough Waves</span>
+            <span><i class="legend-dot warning"></i> Marine Warning</span>
+            <span><i class="legend-dot info"></i> Advisory Info</span>
+            <span>🎣 PFZ Target</span>
+            <span>🌊 Ocean Station</span>
+            <span>⚠️ Marine Alert</span>
+            <span>🚤 GPS Location</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map Status Bar -->
+      <div class="map-status-bar" aria-live="polite" id="map-status-bar">Standard basemap active</div>
     </section>
-    <aside class="zone-detail-panel" aria-live="polite">${detailHtml(null)}</aside>`;
+    <aside class="zone-detail-panel" aria-live="polite" style="display:none;">${detailHtml(null)}</aside>
+  `;
 
   const mapEl = container.querySelector('#orca-marine-map');
   const panel = container.querySelector('.zone-detail-panel');
@@ -203,7 +253,9 @@ function renderMarineMap(container, data, onAskOrca) {
     mapEl.innerHTML = '<div class="map-load-error">Map engine unavailable.</div>';
     return;
   }
-  L.control.zoom({ position: 'topleft' }).addTo(map);
+  L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+  // Basemaps
   const basemaps = {
     standard: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }),
     satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Tiles © Esri' }),
@@ -216,6 +268,7 @@ function renderMarineMap(container, data, onAskOrca) {
   let activeBasemap = 'standard';
   basemaps.standard.addTo(map);
 
+  // Layer groups
   const groups = {
     favourable: L.layerGroup().addTo(map),
     caution: L.layerGroup().addTo(map),
@@ -229,11 +282,11 @@ function renderMarineMap(container, data, onAskOrca) {
   const zoneLayers = new Map();
   let routeLine = null;
 
-  const selectZone = (zone, layer) => {
+  const selectZone = (zone, layer, openPopup = true) => {
     activeZone = zone;
-    panel.innerHTML = detailHtml(zone);
+    if (panel) panel.innerHTML = detailHtml(zone);
     mapContextCallback?.(zone, userLocation);
-    if (layer) {
+    if (layer && openPopup) {
       map.flyToBounds(layer.getBounds ? layer.getBounds().pad(0.7) : L.latLngBounds([[zone.coordinates.lat, zone.coordinates.lon]]), { maxZoom: 8, duration: 0.7 });
       layer.openPopup?.();
     }
@@ -241,35 +294,55 @@ function renderMarineMap(container, data, onAskOrca) {
   };
 
   const bindPanelActions = () => {
-    panel.querySelector('.zone-ask')?.addEventListener('click', () => onAskOrca?.(activeZone, userLocation));
-    panel.querySelector('.zone-details')?.addEventListener('click', () => {
+    panel?.querySelector('.zone-ask')?.addEventListener('click', () => onAskOrca?.(activeZone, userLocation));
+    panel?.querySelector('.zone-details')?.addEventListener('click', () => {
       panel.classList.toggle('zone-detail-expanded');
       const button = panel.querySelector('.zone-details');
       if (button) button.textContent = panel.classList.contains('zone-detail-expanded') ? '⌃ Less' : '⌄ Details';
     });
   };
 
+  // PFZ Zones
   data.zones.forEach((zone) => {
     const bounds = [[zone.bounds.south, zone.bounds.west], [zone.bounds.north, zone.bounds.east]];
-    const rectangle = L.rectangle(bounds, { color: zone.risk.color, weight: 2, fillColor: zone.risk.color, fillOpacity: 0.18 }).bindPopup(zonePopup(zone), { closeButton: false });
-    rectangle.on('click', () => selectZone(zone, rectangle));
+    const rectangle = L.rectangle(bounds, {
+      color: zone.risk.color,
+      weight: 2,
+      fillColor: zone.risk.color,
+      fillOpacity: 0.18,
+      className: 'pfz-zone',
+    }).bindPopup(zonePopup(zone), { closeButton: true, className: 'pfz-leaflet-popup' });
+
+    rectangle.on('click', () => selectZone(zone, rectangle, true));
     rectangle.addTo(groups[zone.risk.level]);
+
+    // Target marker
     const target = L.marker([zone.coordinates.lat, zone.coordinates.lon], {
-      icon: L.divIcon({ className: 'pfz-target-icon', html: `<span style="--zone-color:${zone.risk.color}">🎣</span>`, iconSize: [34, 34], iconAnchor: [17, 17] }),
+      icon: L.divIcon({
+        className: 'pfz-target-icon',
+        html: `<span style="--zone-color:${zone.risk.color}">🎣</span>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      }),
       title: `${zone.name} PFZ`,
-    }).bindPopup(zonePopup(zone), { closeButton: false });
-    target.on('click', () => selectZone(zone, rectangle));
+    }).bindPopup(zonePopup(zone), { closeButton: true, className: 'pfz-leaflet-popup' });
+    target.on('click', () => selectZone(zone, rectangle, true));
     target.addTo(groups.targets);
+
+    // Weather marker (wind)
     L.circleMarker([zone.coordinates.lat, zone.coordinates.lon], {
       radius: 9,
       color: '#7dd3fc',
       fillColor: '#38bdf8',
       fillOpacity: 0.35,
       weight: 2,
-    }).bindPopup(weatherPopup(zone), { closeButton: false }).addTo(groups.weather);
+      className: 'weather-marker',
+    }).bindPopup(weatherPopup(zone), { closeButton: true, className: 'pfz-leaflet-popup' }).addTo(groups.weather);
+
     zoneLayers.set(zone.id, rectangle);
   });
 
+  // Ocean Conditions
   (data.ocean_conditions || []).forEach((observation) => {
     const marker = L.circleMarker([observation.coordinates.lat, observation.coordinates.lon], {
       radius: 10,
@@ -277,10 +350,12 @@ function renderMarineMap(container, data, onAskOrca) {
       fillColor: observation.condition.color,
       fillOpacity: 0.52,
       weight: 2,
-    }).bindPopup(oceanPopup(observation), { closeButton: false });
+      className: 'ocean-marker',
+    }).bindPopup(oceanPopup(observation), { closeButton: true, className: 'pfz-leaflet-popup' });
     marker.addTo(groups.ocean);
   });
 
+  // Marine Alerts
   (data.marine_alerts || []).forEach((alert, index) => {
     const marker = L.circleMarker([alert.coordinates.lat + (index % 3) * 0.08, alert.coordinates.lon + (index % 3) * 0.08], {
       radius: 7,
@@ -288,99 +363,223 @@ function renderMarineMap(container, data, onAskOrca) {
       fillColor: alertColors[alert.severity] || alertColors.INFO,
       fillOpacity: 0.78,
       weight: 2,
-    }).bindPopup(alertPopup(alert), { closeButton: false });
+      className: 'alert-marker',
+    }).bindPopup(alertPopup(alert), { closeButton: true, className: 'pfz-leaflet-popup' });
     marker.addTo(groups.alerts);
   });
 
+  // User Location
   const setUserLocation = (position) => {
     userLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
     groups.location.clearLayers();
-    const marker = L.marker([userLocation.lat, userLocation.lon], { icon: L.divIcon({ className: 'user-vessel-icon', html: '<span>🚤</span>', iconSize: [38, 38], iconAnchor: [19, 19] }) }).bindPopup('Your GPS location');
+    const marker = L.marker([userLocation.lat, userLocation.lon], {
+      icon: L.divIcon({ className: 'user-vessel-icon', html: '<span>🚤</span>', iconSize: [38, 38], iconAnchor: [19, 19] }),
+    }).bindPopup('Your GPS location', { closeButton: true });
     marker.addTo(groups.location);
     if (activeZone) {
       if (routeLine) groups.location.removeLayer(routeLine);
-      routeLine = L.polyline([[userLocation.lat, userLocation.lon], [activeZone.coordinates.lat, activeZone.coordinates.lon]], { color: '#38bdf8', dashArray: '7 8', weight: 2 }).addTo(groups.location);
-      selectZone(activeZone);
+      routeLine = L.polyline([[userLocation.lat, userLocation.lon], [activeZone.coordinates.lat, activeZone.coordinates.lon]], {
+        color: '#38bdf8', dashArray: '7 8', weight: 2,
+      }).addTo(groups.location);
+      selectZone(activeZone, null, false);
     }
     map.flyTo([userLocation.lat, userLocation.lon], 8, { duration: 0.8 });
     const locate = container.querySelector('.map-locate');
-    if (locate) locate.textContent = '📍 GPS active';
+    if (locate) locate.textContent = '📍';
+    locate?.setAttribute('title', 'GPS Active');
   };
 
   const requestLocation = () => {
     const locate = container.querySelector('.map-locate');
     if (!navigator.geolocation) {
-      if (locate) locate.textContent = 'GPS unavailable';
+      if (locate) locate.textContent = '❌';
       return;
     }
-    if (locate) locate.textContent = 'Locating…';
+    if (locate) locate.textContent = '🔄';
     navigator.geolocation.getCurrentPosition(setUserLocation, () => {
-      if (locate) locate.textContent = 'GPS permission needed';
+      if (locate) locate.textContent = '❌';
     }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
   };
 
-  const basemapPicker = container.querySelector('.map-basemap');
-  const controlStatus = container.querySelector('.map-control-status');
+  // Basemap switching & Dropdown
+  const basemapButtons = container.querySelectorAll('.basemap-btn');
+  const statusBar = container.querySelector('#map-status-bar');
+  const basemapContainer = container.querySelector('#basemap-dropdown-container');
+  const basemapPillBtn = container.querySelector('#basemap-pill-btn');
+  const closeBasemapBtn = container.querySelector('#close-basemap-btn');
+  const basemapPillIcon = container.querySelector('#basemap-pill-icon');
+  const basemapPillText = container.querySelector('#basemap-pill-text');
+  const basemapIcons = { standard: '🗺️', satellite: '🛰️', hybrid: '🗺️🛰️', terrain: '⛰️' };
+
+  const toggleBasemapDropdown = (open) => {
+    const shouldOpen = typeof open === 'boolean' ? open : !basemapContainer?.classList.contains('is-open');
+    if (shouldOpen) {
+      layerContainer?.classList.remove('is-open');
+      layerPillBtn?.setAttribute('aria-expanded', 'false');
+    }
+    basemapContainer?.classList.toggle('is-open', shouldOpen);
+    basemapPillBtn?.setAttribute('aria-expanded', String(shouldOpen));
+  };
+  basemapPillBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleBasemapDropdown();
+  });
+  closeBasemapBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleBasemapDropdown(false);
+  });
+
   const setBasemap = (name) => {
     if (!basemaps[name]) return;
     map.removeLayer(basemaps[activeBasemap]);
     activeBasemap = name;
     basemaps[activeBasemap].addTo(map);
-    if (basemapPicker) basemapPicker.value = activeBasemap;
-    if (controlStatus) controlStatus.textContent = `${name[0].toUpperCase()}${name.slice(1)} basemap active`;
+    basemapButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.basemap === name);
+    });
+    if (basemapPillIcon) basemapPillIcon.textContent = basemapIcons[name] || '🗺️';
+    if (basemapPillText) basemapPillText.textContent = `${name[0].toUpperCase()}${name.slice(1)}`;
+    if (statusBar) statusBar.textContent = `${name[0].toUpperCase()}${name.slice(1)} basemap active`;
+    toggleBasemapDropdown(false);
   };
-  Object.entries(basemaps).forEach(([name, layer]) => layer.on('tileerror', () => {
-    if (activeBasemap === name && name !== 'standard') {
-      setBasemap('standard');
-      if (controlStatus) controlStatus.textContent = `${name[0].toUpperCase()}${name.slice(1)} is unavailable · Standard restored`;
+  Object.entries(basemaps).forEach(([name, layer]) => {
+    // L.layerGroup does not emit tile events — only bind to actual tile layers
+    if (typeof layer.on === 'function' && layer.options && 'maxZoom' in layer.options) {
+      layer.on('tileerror', () => {
+        if (activeBasemap === name && name !== 'standard') {
+          setBasemap('standard');
+          if (statusBar) statusBar.textContent = `${name[0].toUpperCase()}${name.slice(1)} unavailable · Standard restored`;
+        }
+      });
     }
-  }));
-  basemapPicker?.addEventListener('change', (event) => setBasemap(event.target.value));
+  });
+  basemapButtons.forEach(btn => btn.addEventListener('click', () => setBasemap(btn.dataset.basemap)));
 
-  const searchMap = () => {
-    const query = container.querySelector('.map-search-input')?.value.trim().toLowerCase();
-    if (!query) return;
-    const zone = data.zones.find((item) => `${item.name} ${item.state}`.toLowerCase().includes(query));
-    if (zone) {
-      selectZone(zone, zoneLayers.get(zone.id));
-      if (controlStatus) controlStatus.textContent = `${zone.name} selected`;
-      return;
+  // Layer Dropdown & Toggles
+  const layerContainer = container.querySelector('#layer-dropdown-container');
+  const layerPillBtn = container.querySelector('#layer-pill-btn');
+  const closeLayersBtn = container.querySelector('#close-layers-btn');
+  const activeLayersBadge = container.querySelector('#active-layers-badge');
+
+  const toggleLayerDropdown = (open) => {
+    const shouldOpen = typeof open === 'boolean' ? open : !layerContainer?.classList.contains('is-open');
+    if (shouldOpen) {
+      basemapContainer?.classList.remove('is-open');
+      basemapPillBtn?.setAttribute('aria-expanded', 'false');
     }
-    const ocean = data.ocean_conditions?.find((item) => `${item.region} ${item.state}`.toLowerCase().includes(query));
-    if (ocean) {
-      map.flyTo([ocean.coordinates.lat, ocean.coordinates.lon], 7, { duration: 0.7 });
-      if (controlStatus) controlStatus.textContent = `${ocean.region} centered`;
-      return;
-    }
-    if (controlStatus) controlStatus.textContent = 'No matching advisory region';
+    layerContainer?.classList.toggle('is-open', shouldOpen);
+    layerPillBtn?.setAttribute('aria-expanded', String(shouldOpen));
   };
+  layerPillBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleLayerDropdown();
+  });
+  closeLayersBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleLayerDropdown(false);
+  });
 
   const layerSets = {
     pfz: [groups.favourable, groups.caution, groups['high-risk'], groups.targets],
     ocean: [groups.ocean],
     alerts: [groups.alerts],
     weather: [groups.weather],
-  };
-  const toggleLayer = (name, button) => {
-    const visible = map.hasLayer(layerSets[name][0]);
-    layerSets[name].forEach((layer) => (visible ? map.removeLayer(layer) : layer.addTo(map)));
-    button.classList.toggle('is-active', !visible);
-    button.setAttribute('aria-pressed', String(!visible));
-    if (controlStatus) controlStatus.textContent = `${button.textContent.trim()} layer ${visible ? 'hidden' : 'shown'}`;
+    location: [groups.location],
   };
 
-  container.querySelector('.map-locate').addEventListener('click', requestLocation);
-  container.querySelector('.map-reset').addEventListener('click', () => {
+  const updateActiveBadge = () => {
+    const activeCount = Object.keys(layerSets).filter(k => map.hasLayer(layerSets[k][0])).length;
+    if (activeLayersBadge) activeLayersBadge.textContent = String(activeCount);
+  };
+
+  const toggleLayer = (name, button) => {
+    const visible = map.hasLayer(layerSets[name][0]);
+    layerSets[name].forEach(layer => (visible ? map.removeLayer(layer) : layer.addTo(map)));
+    button.classList.toggle('is-active', !visible);
+    button.setAttribute('aria-pressed', String(!visible));
+    updateActiveBadge();
+    if (statusBar) statusBar.textContent = `${button.querySelector('.layer-icon')?.textContent || ''} ${button.textContent.trim().replace(/^[🎣🌊⚠️☁️🚤]\s*/, '')} layer ${visible ? 'hidden' : 'shown'}`;
+  };
+  container.querySelectorAll('.map-layer-btn').forEach(button => {
+    button.addEventListener('click', () => toggleLayer(button.dataset.layer, button));
+  });
+
+  // Search & Clear
+  const searchInput = container.querySelector('.map-search-input');
+  const searchClearBtn = container.querySelector('#search-clear-btn');
+
+  const searchMap = () => {
+    const query = searchInput?.value.trim().toLowerCase();
+    if (!query) return;
+    const zone = data.zones.find(item => `${item.name} ${item.state}`.toLowerCase().includes(query));
+    if (zone) {
+      selectZone(zone, zoneLayers.get(zone.id), true);
+      if (statusBar) statusBar.textContent = `${zone.name} selected`;
+      return;
+    }
+    const ocean = data.ocean_conditions?.find(item => `${item.region} ${item.state}`.toLowerCase().includes(query));
+    if (ocean) {
+      map.flyTo([ocean.coordinates.lat, ocean.coordinates.lon], 7, { duration: 0.7 });
+      if (statusBar) statusBar.textContent = `${ocean.region} centered`;
+      return;
+    }
+    if (statusBar) statusBar.textContent = 'No matching advisory region';
+  };
+
+  searchInput?.addEventListener('input', () => {
+    if (searchClearBtn) searchClearBtn.style.display = searchInput.value.trim() ? 'flex' : 'none';
+  });
+  searchClearBtn?.addEventListener('click', () => {
+    if (searchInput) searchInput.value = '';
+    if (searchClearBtn) searchClearBtn.style.display = 'none';
+    searchInput?.focus();
+    if (statusBar) statusBar.textContent = 'Search cleared';
+  });
+  searchInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') searchMap();
+    if (event.key === 'Escape') {
+      if (searchInput) searchInput.value = '';
+      if (searchClearBtn) searchClearBtn.style.display = 'none';
+    }
+  });
+
+  // Map actions
+  container.querySelector('.map-locate')?.addEventListener('click', requestLocation);
+  container.querySelector('.map-reset')?.addEventListener('click', () => {
     map.closePopup();
     map.flyTo(indianWestCoast, 5, { duration: 0.7 });
-    if (controlStatus) controlStatus.textContent = 'Map view reset';
+    if (statusBar) statusBar.textContent = 'Map view reset';
   });
-  container.querySelector('.map-search-button').addEventListener('click', searchMap);
-  container.querySelector('.map-search-input').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') searchMap();
+
+  // Best zone
+  container.querySelector('.best-zone')?.addEventListener('click', () => {
+    const ordered = [...data.zones].sort((a, b) => {
+      const distanceWeight = userLocation ? distanceKm(userLocation, a.coordinates) - distanceKm(userLocation, b.coordinates) : 0;
+      return (scoreZone(b) - scoreZone(a)) || distanceWeight;
+    });
+    const best = ordered[0];
+    selectZone(best, zoneLayers.get(best.id), true);
+    const button = container.querySelector('.best-zone');
+    button.textContent = `✓ Best: ${best.state}`;
+    setTimeout(() => { button.textContent = '🎯'; }, 2400);
   });
-    const legendWidget = container.querySelector('.marine-map-legend-widget');
+
+  // Zen Mode (Clean Map View)
+  const zenBtn = container.querySelector('#map-zen-btn');
+  const mapCard = container.querySelector('.marine-map-card');
+  zenBtn?.addEventListener('click', () => {
+    const isZen = mapCard.classList.toggle('map-zen-mode');
+    zenBtn.classList.toggle('active', isZen);
+    zenBtn.textContent = isZen ? '✕' : '👁️';
+    zenBtn.title = isZen ? 'Exit Clean Map view' : 'Toggle Clean Map view (hide all panels)';
+    if (statusBar) statusBar.textContent = isZen ? 'Clean view active · Tap ✕ to restore controls' : 'Controls restored';
+  });
+
+  // Legend toggle & close
+  const legendWidget = container.querySelector('#map-legend-widget');
   const legendBtn = container.querySelector('.legend-toggle-btn');
+  const legendCloseBtn = container.querySelector('#legend-close-btn');
+
   if (legendBtn && legendWidget) {
     legendBtn.addEventListener('click', () => {
       const isOpen = legendWidget.classList.toggle('is-open');
@@ -389,23 +588,32 @@ function renderMarineMap(container, data, onAskOrca) {
       if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
     });
   }
-
-  container.querySelectorAll('.map-layer-button').forEach((button) => {
-    button.addEventListener('click', () => toggleLayer(button.dataset.layer, button));
-  });
-  container.querySelector('.best-zone').addEventListener('click', () => {
-    const ordered = [...data.zones].sort((a, b) => {
-      const distanceWeight = userLocation ? distanceKm(userLocation, a.coordinates) - distanceKm(userLocation, b.coordinates) : 0;
-      return (scoreZone(b) - scoreZone(a)) || distanceWeight;
-    });
-    const best = ordered[0];
-    selectZone(best, zoneLayers.get(best.id));
-    const button = container.querySelector('.best-zone');
-    button.textContent = `✓ Best: ${best.state}`;
-    setTimeout(() => { button.textContent = '🎯 Find Best Zone'; }, 2400);
+  legendCloseBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    legendWidget?.classList.remove('is-open');
+    legendBtn?.setAttribute('aria-expanded', 'false');
+    const arrow = legendBtn?.querySelector('.toggle-arrow');
+    if (arrow) arrow.textContent = '▾';
   });
 
+  // Click outside to close open dropdowns
+  document.addEventListener('click', (e) => {
+    if (layerContainer?.classList.contains('is-open') && !layerContainer.contains(e.target)) {
+      toggleLayerDropdown(false);
+    }
+    if (basemapContainer?.classList.contains('is-open') && !basemapContainer.contains(e.target)) {
+      toggleBasemapDropdown(false);
+    }
+    if (legendWidget?.classList.contains('is-open') && !legendWidget.contains(e.target)) {
+      legendWidget.classList.remove('is-open');
+      legendBtn?.setAttribute('aria-expanded', 'false');
+      const arrow = legendBtn?.querySelector('.toggle-arrow');
+      if (arrow) arrow.textContent = '▾';
+    }
+  });
+
+  // Auto-select best zone on load silently without popping up intrusive dialog
   const best = [...data.zones].sort((a, b) => scoreZone(b) - scoreZone(a))[0];
-  selectZone(best, zoneLayers.get(best.id));
+  selectZone(best, zoneLayers.get(best.id), false);
   setTimeout(() => map.invalidateSize(), 100);
 }

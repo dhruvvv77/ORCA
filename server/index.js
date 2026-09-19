@@ -158,7 +158,7 @@ app.post('/api/translate', async (req, res) => {
 async function startServer() {
   PORT = await findAvailablePort(DEFAULT_PORT);
 
-  const server = app.listen(PORT, () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n⛅ WeatherGPT server running on http://localhost:${PORT}`);
 
     const groqOk = process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'your_groq_api_key_here';
