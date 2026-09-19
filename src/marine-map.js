@@ -35,6 +35,39 @@ function zonePopup(zone) {
   </div>`;
 }
 
+function oceanPopup(observation) {
+  const sst = observation.sst?.value ?? '—';
+  const chlorophyll = observation.chlorophyll?.value ?? '—';
+  return `<div class="marine-popup ocean-popup">
+    <strong>🌊 ${escapeHtml(observation.region)}</strong>
+    <span class="marine-popup-status" style="color:${observation.condition.color}">● ${escapeHtml(observation.condition.label)}</span>
+    <small>SST ${escapeHtml(sst)}°C · Chlorophyll ${escapeHtml(chlorophyll)} mg/m³</small>
+    <small><strong>MOCK/DEMO</strong> · ${escapeHtml(observation.source)}</small>
+  </div>`;
+}
+
+const alertColors = { INFO: '#38bdf8', CAUTION: '#facc15', WARNING: '#fb923c', DANGER: '#ef4444' };
+
+function alertPopup(alert) {
+  return `<div class="marine-popup marine-alert-popup">
+    <strong>⚠️ ${escapeHtml(alert.title)}</strong>
+    <span class="marine-popup-status" style="color:${alertColors[alert.severity] || alertColors.INFO}">● ${escapeHtml(alert.severity)}</span>
+    <small>${escapeHtml(alert.message)}</small>
+    <small>Affected zone: ${escapeHtml(alert.affected_zone || 'not supplied')}</small>
+    <small>Source: ${escapeHtml(alert.source)}</small>
+    <small>Timestamp: ${escapeHtml(alert.timestamp || 'not supplied')} ${alert.is_demo ? '· MOCK/DEMO' : ''}</small>
+  </div>`;
+}
+
+function weatherPopup(zone) {
+  return `<div class="marine-popup weather-popup">
+    <strong>☁️ ${escapeHtml(zone.state)} wind telemetry</strong>
+    <span class="marine-popup-status" style="color:#7dd3fc">● DEMO WEATHER LAYER</span>
+    <small>Wind: ${escapeHtml(zone.wind_speed_knots)} kt</small>
+    <small><strong>MOCK/DEMO</strong> · Existing PFZ advisory telemetry</small>
+  </div>`;
+}
+
 function detailHtml(zone) {
   if (!zone) {
     return `<div class="zone-empty"><span>🎣</span><strong>Select a PFZ zone</strong><p>Tap a coloured marine zone to see fish, safety and ocean telemetry.</p></div>`;
@@ -89,13 +122,77 @@ export async function createMarineMap(container, { onAskOrca, onZoneChange } = {
 function renderMarineMap(container, data, onAskOrca) {
   container.innerHTML = `
     <section class="marine-map-card" aria-label="ORCA marine operations map">
-      <div class="marine-map-topbar">
-        <div><div class="eyebrow">LIVE DEMO COMMAND MAP</div><h1>Marine intelligence, mapped.</h1></div>
-        <div class="map-top-actions"><button type="button" class="map-locate">📍 My location</button><button type="button" class="best-zone">🎯 Find Best Zone</button></div>
+      <header class="marine-map-header">
+        <div class="map-header-branding">
+          <div class="eyebrow">ORCA OPERATIONS · MARITIME INTELLIGENCE</div>
+          <div class="map-title-row">
+            <h1>Marine Operations Map</h1>
+            <div class="map-status-strip">
+              <span class="status-chip"><b class="dot pfz">●</b> ${data.zones.length} PFZ Zones</span>
+              <span class="status-chip"><b class="dot ocean">◌</b> ${data.ocean_conditions?.length || 0} Ocean Sectors</span>
+              <span class="status-chip"><b class="dot alert">⚠</b> ${data.marine_alerts?.length || 0} Alerts</span>
+            </div>
+          </div>
+        </div>
+        <div class="map-header-controls">
+          <div class="map-search-bar">
+            <input class="map-search-input" type="search" placeholder="Search zone or state..." aria-label="Search map regions">
+            <button type="button" class="map-search-button">Search</button>
+          </div>
+          <div class="map-quick-actions">
+            <label class="map-basemap-picker" title="Switch basemap">
+              <span class="basemap-icon">🗺️</span>
+              <select class="map-basemap" aria-label="Map basemap">
+                <option value="standard">Standard</option>
+                <option value="satellite">Satellite</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="terrain">Terrain</option>
+              </select>
+            </label>
+            <button type="button" class="map-action-btn map-locate" title="Find my location">📍 Locate me</button>
+            <button type="button" class="map-action-btn map-reset" title="Reset map view">↺ Reset</button>
+            <button type="button" class="map-action-btn best-zone" title="Find highest-scoring fishing zone">🎯 Best Zone</button>
+          </div>
+        </div>
+      </header>
+      <div class="marine-map-viewport">
+        <div class="marine-map-canvas" id="orca-marine-map"></div>
+        <div class="map-layer-toolbar" role="group" aria-label="Toggle map layers">
+          <span class="toolbar-label">Layers:</span>
+          <button type="button" class="map-layer-button is-active" data-layer="pfz" aria-pressed="true">🎣 PFZ</button>
+          <button type="button" class="map-layer-button is-active" data-layer="ocean" aria-pressed="true">🌊 Ocean</button>
+          <button type="button" class="map-layer-button is-active" data-layer="alerts" aria-pressed="true">⚠️ Alerts</button>
+          <button type="button" class="map-layer-button" data-layer="weather" aria-pressed="false">☁️ Weather</button>
+        </div>
+        <div class="marine-map-legend-widget">
+          <button type="button" class="legend-toggle-btn" aria-expanded="false" aria-label="Toggle map legend">
+            <span class="legend-quick-indicators">
+              <i class="legend-dot good"></i> Favourable
+              <i class="legend-dot caution"></i> Caution
+              <i class="legend-dot danger"></i> High Risk
+            </span>
+            <span class="legend-toggle-label">Legend <span class="toggle-arrow">▾</span></span>
+          </button>
+          <div class="legend-expanded-popover">
+            <div class="legend-section-title">ADVISORY STATUS</div>
+            <div class="legend-grid">
+              <span><i class="legend-dot good"></i> Favourable PFZ / calm</span>
+              <span><i class="legend-dot caution"></i> Caution / moderate swell</span>
+              <span><i class="legend-dot danger"></i> High risk / rough waves</span>
+              <span><i class="legend-dot warning"></i> Marine Warning</span>
+              <span><i class="legend-dot info"></i> Advisory Info</span>
+              <span>🎣 PFZ Target</span>
+              <span>🌊 Ocean Station</span>
+              <span>⚠️ Marine Alert</span>
+              <span>🚤 GPS Location</span>
+            </div>
+          </div>
+        </div>
+        <div class="map-control-status" aria-live="polite">Standard basemap active</div>
       </div>
-      <div class="marine-map-canvas" id="orca-marine-map"></div>
-      <div class="marine-map-legend" aria-label="Map legend"><strong>ADVISORY STATUS</strong><span><i class="legend-dot good"></i> Favourable PFZ</span><span><i class="legend-dot caution"></i> Caution</span><span><i class="legend-dot danger"></i> High risk</span><span>🎣 PFZ target</span><span>🚤 Your position</span></div>
-      <div class="marine-map-note">${escapeHtml(data.source)} · updated ${data.last_updated ? new Date(data.last_updated).toISOString().slice(0, 10) : 'not supplied'}</div>
+      <footer class="marine-map-footer">
+        <span class="map-note">Simulated INCOIS/ISRO telemetry · Updated ${data.last_updated ? new Date(data.last_updated).toISOString().slice(0, 10) : 'recent'}</span>
+      </footer>
     </section>
     <aside class="zone-detail-panel" aria-live="polite">${detailHtml(null)}</aside>`;
 
@@ -106,14 +203,27 @@ function renderMarineMap(container, data, onAskOrca) {
     mapEl.innerHTML = '<div class="map-load-error">Map engine unavailable.</div>';
     return;
   }
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+  L.control.zoom({ position: 'topleft' }).addTo(map);
+  const basemaps = {
+    standard: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Tiles © Esri' }),
+    hybrid: L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Tiles © Esri' }),
+      L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: 'Labels © Esri' }),
+    ]),
+    terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenTopoMap contributors' }),
+  };
+  let activeBasemap = 'standard';
+  basemaps.standard.addTo(map);
 
   const groups = {
     favourable: L.layerGroup().addTo(map),
     caution: L.layerGroup().addTo(map),
     'high-risk': L.layerGroup().addTo(map),
     targets: L.layerGroup().addTo(map),
+    ocean: L.layerGroup().addTo(map),
+    alerts: L.layerGroup().addTo(map),
+    weather: L.layerGroup(),
     location: L.layerGroup().addTo(map),
   };
   const zoneLayers = new Map();
@@ -150,16 +260,37 @@ function renderMarineMap(container, data, onAskOrca) {
     }).bindPopup(zonePopup(zone), { closeButton: false });
     target.on('click', () => selectZone(zone, rectangle));
     target.addTo(groups.targets);
+    L.circleMarker([zone.coordinates.lat, zone.coordinates.lon], {
+      radius: 9,
+      color: '#7dd3fc',
+      fillColor: '#38bdf8',
+      fillOpacity: 0.35,
+      weight: 2,
+    }).bindPopup(weatherPopup(zone), { closeButton: false }).addTo(groups.weather);
     zoneLayers.set(zone.id, rectangle);
   });
 
-  L.control.layers(null, {
-    '🟢 Favourable PFZ': groups.favourable,
-    '🟡 Caution zones': groups.caution,
-    '🔴 High-risk zones': groups['high-risk'],
-    '🎣 PFZ targets': groups.targets,
-    '🚤 My location': groups.location,
-  }, { position: 'topright', collapsed: false }).addTo(map);
+  (data.ocean_conditions || []).forEach((observation) => {
+    const marker = L.circleMarker([observation.coordinates.lat, observation.coordinates.lon], {
+      radius: 10,
+      color: observation.condition.color,
+      fillColor: observation.condition.color,
+      fillOpacity: 0.52,
+      weight: 2,
+    }).bindPopup(oceanPopup(observation), { closeButton: false });
+    marker.addTo(groups.ocean);
+  });
+
+  (data.marine_alerts || []).forEach((alert, index) => {
+    const marker = L.circleMarker([alert.coordinates.lat + (index % 3) * 0.08, alert.coordinates.lon + (index % 3) * 0.08], {
+      radius: 7,
+      color: alertColors[alert.severity] || alertColors.INFO,
+      fillColor: alertColors[alert.severity] || alertColors.INFO,
+      fillOpacity: 0.78,
+      weight: 2,
+    }).bindPopup(alertPopup(alert), { closeButton: false });
+    marker.addTo(groups.alerts);
+  });
 
   const setUserLocation = (position) => {
     userLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
@@ -188,7 +319,80 @@ function renderMarineMap(container, data, onAskOrca) {
     }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
   };
 
+  const basemapPicker = container.querySelector('.map-basemap');
+  const controlStatus = container.querySelector('.map-control-status');
+  const setBasemap = (name) => {
+    if (!basemaps[name]) return;
+    map.removeLayer(basemaps[activeBasemap]);
+    activeBasemap = name;
+    basemaps[activeBasemap].addTo(map);
+    if (basemapPicker) basemapPicker.value = activeBasemap;
+    if (controlStatus) controlStatus.textContent = `${name[0].toUpperCase()}${name.slice(1)} basemap active`;
+  };
+  Object.entries(basemaps).forEach(([name, layer]) => layer.on('tileerror', () => {
+    if (activeBasemap === name && name !== 'standard') {
+      setBasemap('standard');
+      if (controlStatus) controlStatus.textContent = `${name[0].toUpperCase()}${name.slice(1)} is unavailable · Standard restored`;
+    }
+  }));
+  basemapPicker?.addEventListener('change', (event) => setBasemap(event.target.value));
+
+  const searchMap = () => {
+    const query = container.querySelector('.map-search-input')?.value.trim().toLowerCase();
+    if (!query) return;
+    const zone = data.zones.find((item) => `${item.name} ${item.state}`.toLowerCase().includes(query));
+    if (zone) {
+      selectZone(zone, zoneLayers.get(zone.id));
+      if (controlStatus) controlStatus.textContent = `${zone.name} selected`;
+      return;
+    }
+    const ocean = data.ocean_conditions?.find((item) => `${item.region} ${item.state}`.toLowerCase().includes(query));
+    if (ocean) {
+      map.flyTo([ocean.coordinates.lat, ocean.coordinates.lon], 7, { duration: 0.7 });
+      if (controlStatus) controlStatus.textContent = `${ocean.region} centered`;
+      return;
+    }
+    if (controlStatus) controlStatus.textContent = 'No matching advisory region';
+  };
+
+  const layerSets = {
+    pfz: [groups.favourable, groups.caution, groups['high-risk'], groups.targets],
+    ocean: [groups.ocean],
+    alerts: [groups.alerts],
+    weather: [groups.weather],
+  };
+  const toggleLayer = (name, button) => {
+    const visible = map.hasLayer(layerSets[name][0]);
+    layerSets[name].forEach((layer) => (visible ? map.removeLayer(layer) : layer.addTo(map)));
+    button.classList.toggle('is-active', !visible);
+    button.setAttribute('aria-pressed', String(!visible));
+    if (controlStatus) controlStatus.textContent = `${button.textContent.trim()} layer ${visible ? 'hidden' : 'shown'}`;
+  };
+
   container.querySelector('.map-locate').addEventListener('click', requestLocation);
+  container.querySelector('.map-reset').addEventListener('click', () => {
+    map.closePopup();
+    map.flyTo(indianWestCoast, 5, { duration: 0.7 });
+    if (controlStatus) controlStatus.textContent = 'Map view reset';
+  });
+  container.querySelector('.map-search-button').addEventListener('click', searchMap);
+  container.querySelector('.map-search-input').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') searchMap();
+  });
+    const legendWidget = container.querySelector('.marine-map-legend-widget');
+  const legendBtn = container.querySelector('.legend-toggle-btn');
+  if (legendBtn && legendWidget) {
+    legendBtn.addEventListener('click', () => {
+      const isOpen = legendWidget.classList.toggle('is-open');
+      legendBtn.setAttribute('aria-expanded', String(isOpen));
+      const arrow = legendBtn.querySelector('.toggle-arrow');
+      if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
+    });
+  }
+
+  container.querySelectorAll('.map-layer-button').forEach((button) => {
+    button.addEventListener('click', () => toggleLayer(button.dataset.layer, button));
+  });
   container.querySelector('.best-zone').addEventListener('click', () => {
     const ordered = [...data.zones].sort((a, b) => {
       const distanceWeight = userLocation ? distanceKm(userLocation, a.coordinates) - distanceKm(userLocation, b.coordinates) : 0;

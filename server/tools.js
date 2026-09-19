@@ -7,6 +7,7 @@ import { agentTools as pfzTools, agentHandlers as pfzHandlers } from './agents/p
 import { agentTools as oceanTools, agentHandlers as oceanHandlers } from './agents/ocean-agent.js';
 import { agentTools as gisTools, agentHandlers as gisHandlers } from './agents/gis-agent.js';
 import { agentTools as safetyTools, agentHandlers as safetyHandlers } from './agents/safety-agent.js';
+import { agentTools as marineAlertsTools, agentHandlers as marineAlertsHandlers } from './agents/marine-alerts-agent.js';
 import { agentTools as recommendationTools, agentHandlers as recommendationHandlers } from './agents/recommendation-agent.js';
 import { orchestratorTools, orchestratorHandlers } from './orchestrator.js';
 
@@ -62,6 +63,7 @@ export const toolDefinitions = [
   ...oceanTools,
   ...gisTools,
   ...safetyTools,
+  ...marineAlertsTools,
   ...recommendationTools,
   ...orchestratorTools,
 ];
@@ -84,6 +86,7 @@ export function registerToolHandlers(handlers) {
   Object.assign(toolHandlers, oceanHandlers);
   Object.assign(toolHandlers, gisHandlers);
   Object.assign(toolHandlers, safetyHandlers);
+  Object.assign(toolHandlers, marineAlertsHandlers);
   Object.assign(toolHandlers, recommendationHandlers);
   Object.assign(toolHandlers, orchestratorHandlers);
 }

@@ -11,16 +11,32 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'openai/gpt-oss-120b';
 const MAX_TOOL_ITERATIONS = 2;
 
-function getSystemPrompt() {
+function getCurrentRouteInstruction(intent) {
+  const instructions = {
+    weather_only: 'For this request, the only available tool is get_current_weather.',
+    pfz_only: 'For this request, the only available tool is get_pfz_zones.',
+    ocean_only: 'For this request, the only available tool is get_ocean_data.',
+    marine_alerts: 'For this request, the only available tool is get_marine_alerts.',
+    pfz_distance: 'For this request, the only available tool is calculate_pfz_distances. Omit state unless a string state filter is known.',
+    fishing_recommendation: 'For this request, the only available tool is run_orca_fishing_pipeline. Fishing safety questions use this pipeline, not get_marine_alerts.',
+  };
+  return instructions[intent] || 'Only call tools included in the current request.';
+}
+
+function getSystemPrompt(intent) {
   const today = new Date().toISOString().split('T')[0];
   return `You are ORCA, a concise marine assistant for Indian fishers. Today is ${today}. Use tool data exactly; never invent measurements. Explain weather, ocean, and PFZ data practically. Mention maps or charts when data includes them. Use the user's language when possible. Treat selected marine-map context as factual.
 
 Strict Routing Rules:
-- Before answering a classified weather, PFZ, ocean, or fishing recommendation query, make the matching tool call. Do not answer from general knowledge when that tool is available.
+- Before answering a classified weather, PFZ, ocean, marine alert, or fishing recommendation query, make the matching tool call. Do not answer from general knowledge when that tool is available.
 - Weather queries (e.g. "weather in Mumbai") -> call get_current_weather. NEVER use run_orca_fishing_pipeline.
 - PFZ queries (e.g. "Show PFZ zones in Maharashtra") -> call get_pfz_zones. NEVER use run_orca_fishing_pipeline.
 - Ocean queries (e.g. "What are ocean conditions near Chennai?") -> call get_ocean_data. NEVER use run_orca_fishing_pipeline.
-- Fishing recommendation queries (e.g. "Where can I fish today near Mumbai?") -> call run_orca_fishing_pipeline with location (city and state) and date "${today}".`;
+- Marine safety, warning, or alert queries (e.g. "Any marine alerts near Mumbai?") -> call get_marine_alerts.
+- Nearest or closest PFZ queries (e.g. "Which PFZ is closest to Mumbai?") -> call calculate_pfz_distances.
+- Fishing recommendation queries (e.g. "Where can I fish today near Mumbai?") -> call run_orca_fishing_pipeline with location (city and state) and date "${today}".
+
+${getCurrentRouteInstruction(intent)}`;
 }
 
 function getApiKey() {
@@ -83,19 +99,31 @@ export function classifyQueryIntent(text) {
     return 'fishing_recommendation';
   }
 
-  // 2. Weather-only: asks about weather, forecast, rain, temp, aqi without asking where to fish
+  // 2. GIS: nearest-PFZ questions require distances, not a PFZ listing.
+  const isPFZWord = /\b(pfz|potential fishing zone|fishing zone|fishing zones|zones)\b/i.test(clean);
+  const isDistanceQuestion = /\b(closest|nearest|distance|how far)\b/i.test(clean);
+  if (isPFZWord && isDistanceQuestion) {
+    return 'pfz_distance';
+  }
+
+  // 3. Marine alerts: safety warnings take priority over PFZ/ocean terminology.
+  const isMarineAlertWord = /\b(marine alert|marine alerts|marine safety|safety alert|safety alerts|warning|warnings|danger|dangerous)\b/i.test(clean);
+  if (isMarineAlertWord && !hasFishWord) {
+    return 'marine_alerts';
+  }
+
+  // 4. Weather-only: asks about weather, forecast, rain, temp, aqi without asking where to fish
   const isWeatherWord = /\b(weather|forecast|rain|raining|temp|temperature|climate|wind|humidity|aqi|air quality|mausam)\b|मौसम/i.test(clean);
   if (isWeatherWord && !hasFishWord) {
     return 'weather_only';
   }
 
-  // 3. PFZ-only: asks specifically about PFZ / fishing zones
-  const isPFZWord = /\b(pfz|potential fishing zone|fishing zone|fishing zones|zones)\b/i.test(clean);
+  // 5. PFZ-only: asks specifically about PFZ / fishing zones
   if (isPFZWord && !hasRecommendationIntent) {
     return 'pfz_only';
   }
 
-  // 4. Ocean-only: asks about ocean conditions, wave, SST, chlorophyll, currents
+  // 6. Ocean-only: asks about ocean conditions, wave, SST, chlorophyll, currents
   const isOceanWord = /\b(ocean|sea|marine condition|wave|waves|sst|chlorophyll|current|currents|swell|water temp|salinity)\b/i.test(clean);
   if (isOceanWord && !hasFishWord && !isPFZWord) {
     return 'ocean_only';
@@ -119,6 +147,10 @@ export function toolsForConversation(conversationHistory) {
       return toolDefinitions.filter((t) => t.function.name === 'get_pfz_zones');
     case 'ocean_only':
       return toolDefinitions.filter((t) => t.function.name === 'get_ocean_data');
+    case 'marine_alerts':
+      return toolDefinitions.filter((t) => t.function.name === 'get_marine_alerts');
+    case 'pfz_distance':
+      return toolDefinitions.filter((t) => t.function.name === 'calculate_pfz_distances');
     case 'fishing_recommendation':
       return toolDefinitions.filter((t) => t.function.name === 'run_orca_fishing_pipeline');
     default:
@@ -172,6 +204,17 @@ function fallbackToolCall(intent, query) {
       function: {
         name: 'get_ocean_data',
         arguments: JSON.stringify({ state: location, parameter: 'all' }),
+      },
+    };
+  }
+
+  if (intent === 'marine_alerts') {
+    return {
+      id,
+      type: 'function',
+      function: {
+        name: 'get_marine_alerts',
+        arguments: JSON.stringify(location ? { affected_zone: location } : {}),
       },
     };
   }
@@ -401,7 +444,7 @@ export async function chat(conversationHistory, inputLanguage = 'en') {
   const availableTools = toolsForConversation(recentHistory);
   const queryIntent = classifyQueryIntent(latestUserMessage);
   const messages = [
-    { role: 'system', content: getSystemPrompt() },
+    { role: 'system', content: getSystemPrompt(queryIntent) },
     ...recentHistory,
   ];
 

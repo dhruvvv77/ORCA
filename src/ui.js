@@ -205,6 +205,7 @@ function createHeader() {
         <div class="header-subtitle">Marine Intelligence</div>
       </div>
     </div>
+    <nav class="header-nav" aria-label="Primary navigation"><a href="#marine-home">Operations map</a><button type="button" class="header-ask-orca">Ask ORCA</button></nav>
     <div class="header-agent-status" id="header-agent-status" title="ORCA Marine Telemetry Core · Active">
       <span class="status-pulse-dot"></span>
       <span class="status-text">Marine Core Active</span>
@@ -217,6 +218,7 @@ function createHeader() {
 
   // Bind language picker
   setTimeout(() => {
+    header.querySelector('.header-ask-orca')?.addEventListener('click', openChatPanel);
     const picker = header.querySelector('#lang-picker');
     if (picker) {
       picker.value = getLanguage();

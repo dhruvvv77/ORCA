@@ -95,7 +95,7 @@ export const agentTools = [
         properties: {
           latitude: { type: 'number', description: 'User latitude (-90 to 90).' },
           longitude: { type: 'number', description: 'User longitude (-180 to 180).' },
-          state: { type: 'string', description: 'Optional state filter.' },
+          state: { type: ['string', 'null'], description: 'Optional state filter; null searches all PFZ candidates.' },
           sort: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order.' },
         },
         required: ['latitude', 'longitude'],

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { agentHandlers, haversineDistanceKm } from '../server/agents/gis-agent.js';
+import { agentHandlers, agentTools, haversineDistanceKm } from '../server/agents/gis-agent.js';
 
 test('GIS agent returns Ratnagiri as the nearest Maharashtra PFZ from Mumbai', async () => {
   const result = await agentHandlers.calculate_pfz_distances({
@@ -29,6 +29,19 @@ test('GIS agent can order supplied PFZ candidates by distance', async () => {
 
   assert.deepEqual(result.candidates.map((candidate) => candidate.id), ['far', 'near']);
   assert.equal(result.nearest_pfz.id, 'near');
+});
+
+test('GIS distance tool accepts a missing state filter and searches all PFZ candidates', async () => {
+  const result = await agentHandlers.calculate_pfz_distances({
+    latitude: 19.076,
+    longitude: 72.8777,
+    state: null,
+  });
+
+  assert.deepEqual(agentTools[0].function.parameters.properties.state.type, ['string', 'null']);
+  assert.equal(result.found, true);
+  assert.equal(result.count, 8);
+  assert.equal(result.nearest_pfz.id, 'PFZ-MH-001');
 });
 
 test('Haversine calculation is deterministic', () => {
